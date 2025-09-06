@@ -1,0 +1,59 @@
+[package]
+name = "quest_emu_setup"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = ["reqwest"]
+ureq = []
+reqwest = ["dep:reqwest"]
+
+[dependencies]
+# No need for tracing support
+color-eyre = { version = "0.6", default-features = false }
+
+# progress bar
+pbr = { version = "*" } #{ git = "https://github.com/a8m/pb.git" }
+
+bytes = "*"
+reqwest = { version = "0.12", features = [
+    "blocking",
+    "json",
+    "gzip",
+    "deflate",
+    "rustls-tls",
+], default-features = false, optional = true}
+
+
+
+clap = { version = "4", features = ["derive"] }
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+owo-colors = "4"
+dirs = "6.0.0"
+
+zip = { version = "5", default-features = false, features = [
+    "zstd",
+    "nt-time",
+    "deflate",
+    "deflate-flate2",
+    "deflate-zopfli",
+    "deflate64",
+    "lzma",
+    "bzip2",
+] }
+
+walkdir = "2"
+symlink = "0.1.0"
+fs_extra = "1.2"
+itertools = "0.14"
+indicatif = "0.18.0"
+dialoguer = "0.12.0"
+
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = "symbols"
