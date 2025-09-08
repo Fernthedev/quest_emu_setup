@@ -4,9 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-default = ["reqwest"]
+default = ["reqwest", "clap"]
 ureq = []
 reqwest = ["dep:reqwest"]
+clap = []
 
 [dependencies]
 # No need for tracing support

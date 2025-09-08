@@ -1,0 +1,127 @@
+use std::{io::Cursor, path::PathBuf};
+
+use bytes::{BufMut, BytesMut};
+use color_eyre::eyre::{Context, bail};
+
+use crate::{
+    commands::{Command, GlobalContext},
+    constants::{self, ANDROID_SDK_TOOLS, android_sdk_path, emulator_path},
+    downloader,
+};
+
+#[derive(clap::Parser)]
+pub struct SetupArgs {
+    /// Install the Android SDK tools
+    /// This includes the SDK Manager, platform tools, and build tools
+    /// By default, this is prompted if the tools are not found
+    #[arg(long = "sdk", default_value_t = false)]
+    install_sdk: bool,
+
+    /// Install the Android Emulator and system image
+    #[arg(long = "emulator", default_value_t = false)]
+    install_emulator: bool,
+
+    /// Create an AVD (Android Virtual Device)
+    #[arg(long = "avd", default_value_t = false)]
+    create_avd: bool,
+
+    /// Path to the Android SDK Manager
+    #[arg(long)]
+    sdk_manager_path: Option<PathBuf>,
+}
+
+impl Command for SetupArgs {
+    fn execute(self, ctx: &GlobalContext) -> color_eyre::Result<()> {
+        let sdk_manager = constants::sdkmanager_path();
+
+        if !sdk_manager.exists() {
+            let accepted = ctx.yes
+                || self.install_sdk
+                || dialoguer::Confirm::new()
+                    .with_prompt(
+                        "Android SDK Manager not found. Do you want to download and set it up?",
+                    )
+                    .interact()?;
+            if accepted {
+                setup_sdk_manager().context("Failed to set up SDK Manager")?;
+            }
+        }
+
+        let android_emu_image = ctx.yes
+            || self.install_emulator
+            || dialoguer::Confirm::new()
+                .with_prompt("Do you want to install the Android Emulator and system image?")
+                .interact()?;
+        if android_emu_image {
+            install_tools(&sdk_manager)?;
+        }
+
+        // TODO: Check if emulator image is already installed
+
+        let create_avd = ctx.yes
+            || self.create_avd
+            || dialoguer::Confirm::new()
+                .with_prompt("Do you want to create an AVD (Android Virtual Device)?")
+                .interact()?;
+        if create_avd {
+            create_emulator()?;
+        }
+
+        println!("Setup complete! You can now run the emulator using the 'emulator' command.");
+        println!(
+            "Add {} to your PATH.",
+            sdk_manager.parent().unwrap().display()
+        );
+        println!(
+            "Add {}/emulator to your PATH.",
+            emulator_path().parent().unwrap().display()
+        );
+
+        Ok(())
+    }
+}
+
+pub fn create_emulator() -> Result<(), color_eyre::eyre::Error> {
+    let status = std::process::Command::new(constants::avdmanager_path())
+        .arg("create")
+        .arg("avd")
+        .arg("-n")
+        .arg("android13desktop")
+        .arg("-k")
+        .arg("system-images;android-33;android-desktop;x86_64")
+        .status()
+        .context("Failed to run avdmanager")?;
+    let _: () = if !status.success() {
+        bail!("avdmanager exited with status: {}", status);
+    };
+    Ok(())
+}
+
+pub fn install_tools(sdk_manager: &PathBuf) -> Result<(), color_eyre::eyre::Error> {
+    let status = std::process::Command::new(sdk_manager)
+        .arg("emulator")
+        .arg("platform-tools;system-images;android-33;android-desktop;x86_64")
+        .status()
+        .context("Failed to run sdkmanager")?;
+    if !status.success() {
+        bail!("sdkmanager exited with status: {}", status);
+    };
+    Ok(())
+}
+
+pub fn setup_sdk_manager() -> color_eyre::Result<()> {
+    let client = reqwest::blocking::Client::new();
+
+    println!("Android SDK Tools not found, downloading...");
+    let mut zip_tmp = BytesMut::new().writer();
+    downloader::download_with_progress(&client, ANDROID_SDK_TOOLS, &mut zip_tmp)
+        .context("Failed to download Android SDK Tools")?;
+
+    let zip_cursor = Cursor::new(zip_tmp.into_inner());
+
+    let mut zip = zip::ZipArchive::new(zip_cursor).context("Failed to read downloaded zip file")?;
+
+    zip.extract(android_sdk_path())
+        .context("Failed to extract Android SDK Tools")?;
+    Ok(())
+}

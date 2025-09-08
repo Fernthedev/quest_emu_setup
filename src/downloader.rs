@@ -1,9 +1,7 @@
 use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::blocking::Client;
 use reqwest::header::CONTENT_LENGTH;
-use std::fs::File;
 use std::io::{self, Read, Write};
-use std::path::Path;
 
 #[cfg(feature = "reqwest")]
 pub fn download_with_progress(client: &Client, url: &str, dest: &mut impl Write) -> io::Result<()> {
@@ -22,7 +20,6 @@ pub fn download_with_progress(client: &Client, url: &str, dest: &mut impl Write)
             .unwrap()
             .progress_chars("#>-"),
     );
-
 
     let mut downloaded: u64 = 0;
     let mut buffer = [0; 8192];
