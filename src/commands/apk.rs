@@ -1,11 +1,11 @@
 use std::{fs::File, io::Cursor, path::PathBuf};
 
 // use bytes::{BufMut, Bytes, BytesMut};
-use color_eyre::eyre::{bail, Context};
+use color_eyre::eyre::{Context, bail};
 use mbf_zip::FileCompression;
 
-use crate::axml::{AxmlReader, AxmlWriter, axml_to_xml, xml_to_axml};
 use crate::commands::Command;
+use mbf_axml::{AxmlReader, AxmlWriter, axml_to_xml, xml_to_axml};
 
 #[derive(clap::Parser, Debug)]
 pub struct ApkArgs {
@@ -55,11 +55,12 @@ impl Command for ApkArgs {
 fn patch_manifest(manifest_bytes: Vec<u8>) -> Result<Vec<u8>, color_eyre::eyre::Error> {
     let mut manifest_cursor = Cursor::new(manifest_bytes);
     let mut axml_reader = AxmlReader::new(&mut manifest_cursor)
+        .map_err(|a| color_eyre::eyre::eyre!(a))
         .context("Failed to parse AndroidManifest.xml as AXML")?;
     let mut xml_bytes = Vec::new();
     {
         let mut writer = xml::EventWriter::new(&mut xml_bytes);
-        axml_to_xml(&mut writer, &mut axml_reader)?;
+        axml_to_xml(&mut writer, &mut axml_reader).map_err(|a| color_eyre::eyre::eyre!(a))?;
     }
     let mut xml_str = String::from_utf8(xml_bytes)?;
     let insert_str =
@@ -72,9 +73,7 @@ fn patch_manifest(manifest_bytes: Vec<u8>) -> Result<Vec<u8>, color_eyre::eyre::
                 xml_str.insert_str(idx, insert_str);
             }
             None => {
-                bail!(
-                    "No </manifest> tag found in manifest"
-                );
+                bail!("No </manifest> tag found in manifest");
             }
         }
     }
@@ -82,8 +81,10 @@ fn patch_manifest(manifest_bytes: Vec<u8>) -> Result<Vec<u8>, color_eyre::eyre::
     {
         let mut axml_writer = AxmlWriter::new(&mut axml_bytes);
         let mut xml_reader = xml::EventReader::from_str(&xml_str);
-        xml_to_axml(&mut axml_writer, &mut xml_reader)?;
-        axml_writer.finish()?;
+        xml_to_axml(&mut axml_writer, &mut xml_reader).map_err(|a| color_eyre::eyre::eyre!(a))?;
+        axml_writer
+            .finish()
+            .map_err(|a| color_eyre::eyre::eyre!(a))?;
     }
     Ok(axml_bytes)
 }

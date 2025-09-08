@@ -5,7 +5,6 @@ use crate::commands::{Command, GlobalContext};
 mod commands;
 mod constants;
 mod downloader;
-mod axml;
 
 #[derive(clap::Parser)]
 struct Args {

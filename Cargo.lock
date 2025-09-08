@@ -1210,9 +1210,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "mbf-axml"
+version = "0.1.0"
+source = "git+https://github.com/Lauriethefish/ModsBeforeFriday.git?branch=main#4daf77c701d9feef71b4858c0353831cdde66508"
+dependencies = [
+ "anyhow",
+ "byteorder",
+ "xml",
+]
+
+[[package]]
 name = "mbf-zip"
 version = "0.1.0"
-source = "git+https://github.com/Lauriethefish/ModsBeforeFriday.git?branch=main#02af25da7586d4b1096043af8982a99b3a4897b8"
+source = "git+https://github.com/Lauriethefish/ModsBeforeFriday.git?branch=main#4daf77c701d9feef71b4858c0353831cdde66508"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -1498,6 +1508,7 @@ dependencies = [
  "fs_extra",
  "indicatif",
  "itertools 0.14.0",
+ "mbf-axml",
  "mbf-zip",
  "owo-colors",
  "pbr",
