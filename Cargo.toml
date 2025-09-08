@@ -25,7 +25,10 @@ reqwest = { version = "0.12", features = [
     "rustls-tls",
 ], default-features = false, optional = true}
 
+# For APKs, the zip crate doesn't align the way V2 signature for Android requires. We use Laurie's amazing work here.
+mbf-zip = { git = "https://github.com/Lauriethefish/ModsBeforeFriday.git", package = "mbf-zip", branch = "main" }
 
+# TODO: AXML
 
 clap = { version = "4", features = ["derive"] }
 
