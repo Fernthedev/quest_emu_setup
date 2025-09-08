@@ -11,7 +11,9 @@ pub trait Command {
 
 #[derive(clap::Parser)]
 pub enum MainCommand {
+    /// Initial setup for Quest emulator. Downloads sdkmanager, emulator, system images, etc.
     Setup(setup::SetupArgs),
+    /// Commands for patching APKs
     Apk(apk::ApkArgs),
 }
 

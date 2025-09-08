@@ -34,6 +34,8 @@ impl Command for SetupArgs {
     fn execute(self, ctx: &GlobalContext) -> color_eyre::Result<()> {
         let sdk_manager = constants::sdkmanager_path();
 
+        println!("Using Android SDK path: {}", android_sdk_path().display());
+
         if !sdk_manager.exists() {
             let accepted = ctx.yes
                 || self.install_sdk
@@ -114,7 +116,7 @@ pub fn setup_sdk_manager() -> color_eyre::Result<()> {
 
     println!("Android SDK Tools not found, downloading...");
     println!("Adding to path: {}", android_sdk_path().display());
-    
+
     let mut zip_tmp = BytesMut::new().writer();
     downloader::download_with_progress(&client, ANDROID_SDK_TOOLS, &mut zip_tmp)
         .context("Failed to download Android SDK Tools")?;
