@@ -1,7 +1,7 @@
 use std::{fs::File, io::Cursor, path::PathBuf};
 
 // use bytes::{BufMut, Bytes, BytesMut};
-use color_eyre::eyre::Context;
+use color_eyre::eyre::{bail, Context};
 use mbf_zip::FileCompression;
 
 use crate::axml::{AxmlReader, AxmlWriter, axml_to_xml, xml_to_axml};
@@ -64,12 +64,19 @@ fn patch_manifest(manifest_bytes: Vec<u8>) -> Result<Vec<u8>, color_eyre::eyre::
     let mut xml_str = String::from_utf8(xml_bytes)?;
     let insert_str =
         r#"  <queries>\n    <package android:name=\"com.oculus.horizon\"/>\n  </queries>\n"#;
-    if let Some(idx) = xml_str.rfind("</manifest>") {
-        xml_str.insert_str(idx, insert_str);
-    } else {
-        return Err(color_eyre::eyre::eyre!(
-            "No </manifest> tag found in manifest"
-        ));
+
+    // Check if the <queries> block with the package is already present
+    if !xml_str.contains(r#"<package android:name="com.oculus.horizon""#) {
+        match xml_str.rfind("</manifest>") {
+            Some(idx) => {
+                xml_str.insert_str(idx, insert_str);
+            }
+            None => {
+                bail!(
+                    "No </manifest> tag found in manifest"
+                );
+            }
+        }
     }
     let mut axml_bytes = Vec::new();
     {

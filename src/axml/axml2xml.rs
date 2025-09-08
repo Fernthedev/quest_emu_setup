@@ -255,7 +255,7 @@ pub fn xml_to_axml<W: std::io::Write, R: std::io::Read>(
 
 // Converts an axml name and namespace into an XmlName struct, which wraps the name and namespace slightly differently.
 fn get_xml_name_from_axml<'a>(
-    name: &'a String,
+    name: &'a str,
     namespace: &'a Option<String>,
     // Map of namespace URIs TO namespace prefixes.
     ns_prefixes: &'a HashMap<String, String>,
