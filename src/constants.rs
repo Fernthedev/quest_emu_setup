@@ -25,27 +25,37 @@ pub fn android_sdk_path() -> PathBuf {
         .expect("Could not find Android SDK path. Please set ANDROID_SDK_ROOT or ANDROID_HOME environment variable.")
 }
 
-pub fn sdkmanager_path() -> PathBuf {
+pub fn cmdline_tools_path() -> PathBuf {
     let mut path = android_sdk_path();
-    path.push("cmdline-tools/latest/bin/sdkmanager");
+    path.push("cmdline-tools");
+    path.push("latest");
+    path
+}
+
+pub fn sdkmanager_path() -> PathBuf {
+    let mut path = cmdline_tools_path();
+    path.push("bin");
+    path.push("sdkmanager");
     if cfg!(target_os = "windows") {
-        path.set_extension("exe");
+        path.set_extension("bat");
     }
     path
 }
 
 pub fn avdmanager_path() -> PathBuf {
-    let mut path = android_sdk_path();
-    path.push("cmdline-tools/latest/bin/avdmanager");
+    let mut path = cmdline_tools_path();
+    path.push("bin");
+    path.push("avdmanager");
     if cfg!(target_os = "windows") {
-        path.set_extension("exe");
+        path.set_extension("bat");
     }
     path
 }
 
 pub fn emulator_path() -> PathBuf {
     let mut path = android_sdk_path();
-    path.push("emulator/emulator");
+    path.push("emulator");
+    path.push("emulator");
     if cfg!(target_os = "windows") {
         path.set_extension("exe");
     }

@@ -1,4 +1,8 @@
-use std::{fs::File, io::Cursor, path::PathBuf};
+use std::{
+    fs::File,
+    io::{Cursor, Write},
+    path::PathBuf,
+};
 
 // use bytes::{BufMut, Bytes, BytesMut};
 use color_eyre::eyre::{Context, bail};
@@ -35,7 +39,6 @@ impl Command for ApkArgs {
                     .map_err(|a| color_eyre::eyre::eyre!(a))
                     .context("Failed to read AndroidManifest.xml from APK")?;
                 let axml_bytes = patch_manifest(manifest_bytes)?;
-
                 // Step 4: Write back to APK
                 let mut axml_cursor = Cursor::new(axml_bytes);
                 apk.write_file(MANIFEST_FILE, &mut axml_cursor, FileCompression::Store)
@@ -63,8 +66,7 @@ fn patch_manifest(manifest_bytes: Vec<u8>) -> Result<Vec<u8>, color_eyre::eyre::
         axml_to_xml(&mut writer, &mut axml_reader).map_err(|a| color_eyre::eyre::eyre!(a))?;
     }
     let mut xml_str = String::from_utf8(xml_bytes)?;
-    let insert_str =
-        r#"  <queries>\n    <package android:name=\"com.oculus.horizon\"/>\n  </queries>\n"#;
+    let insert_str = r#"  <queries>    <package android:name="com.oculus.horizon"/>  </queries>"#;
 
     // Check if the <queries> block with the package is already present
     if !xml_str.contains(r#"<package android:name="com.oculus.horizon""#) {

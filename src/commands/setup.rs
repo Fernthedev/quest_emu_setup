@@ -5,7 +5,7 @@ use color_eyre::eyre::{Context, bail};
 
 use crate::{
     commands::{Command, GlobalContext},
-    constants::{self, ANDROID_SDK_TOOLS, android_sdk_path, emulator_path},
+    constants::{self, ANDROID_SDK_TOOLS, android_sdk_path, cmdline_tools_path, emulator_path},
     downloader,
 };
 
@@ -75,7 +75,7 @@ impl Command for SetupArgs {
             sdk_manager.parent().unwrap().display()
         );
         println!(
-            "Add {}/emulator to your PATH.",
+            "Add {} to your PATH.",
             emulator_path().parent().unwrap().display()
         );
 
@@ -102,7 +102,8 @@ pub fn create_emulator() -> Result<(), color_eyre::eyre::Error> {
 pub fn install_tools(sdk_manager: &PathBuf) -> Result<(), color_eyre::eyre::Error> {
     let status = std::process::Command::new(sdk_manager)
         .arg("emulator")
-        .arg("platform-tools;system-images;android-33;android-desktop;x86_64")
+        .arg("platform-tools")
+        .arg("system-images;android-33;android-desktop;x86_64")
         .status()
         .context("Failed to run sdkmanager")?;
     if !status.success() {
@@ -124,8 +125,7 @@ pub fn setup_sdk_manager() -> color_eyre::Result<()> {
     let zip_cursor = Cursor::new(zip_tmp.into_inner());
 
     let mut zip = zip::ZipArchive::new(zip_cursor).context("Failed to read downloaded zip file")?;
-
-    zip.extract(android_sdk_path())
+    zip.extract_unwrapped_root_dir(cmdline_tools_path(), zip::read::root_dir_common_filter)
         .context("Failed to extract Android SDK Tools")?;
     Ok(())
 }
