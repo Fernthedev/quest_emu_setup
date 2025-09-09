@@ -1,5 +1,5 @@
 use std::{
-    fs::File,
+    fs::OpenOptions,
     io::{Cursor, Write},
     path::PathBuf,
 };
@@ -28,7 +28,11 @@ impl Command for ApkArgs {
         match self.action {
             ApkAction::Patch { path } => {
                 println!("Patching APK from path: {path:?}");
-                let apk_file = File::open(&path).context("")?;
+                let apk_file = OpenOptions::new()
+                    .write(true)
+                    .read(true)
+                    .open(&path)
+                    .context("")?;
                 let mut apk = mbf_zip::ZipFile::open(apk_file)
                     .map_err(|a| color_eyre::eyre::eyre!(a))
                     .context("Failed to read APK as zip file")?;
@@ -44,7 +48,11 @@ impl Command for ApkArgs {
                 apk.write_file(MANIFEST_FILE, &mut axml_cursor, FileCompression::Store)
                     .map_err(|a| color_eyre::eyre::eyre!(a))
                     .context("Failed to write modified AndroidManifest.xml back to APK")?;
-
+                const CERT_PEM: &[u8] = include_bytes!("../debug_cert.pem");
+                let (cert, priv_key) = mbf_zip::signing::load_cert_and_priv_key(CERT_PEM);
+                apk.save_and_sign_v2(&priv_key, &cert)
+                    .map_err(|a| color_eyre::eyre::eyre!(a))
+                    .context("Failed to save modified APK")?;
                 println!("Successfully patched AndroidManifest.xml");
             }
         }
