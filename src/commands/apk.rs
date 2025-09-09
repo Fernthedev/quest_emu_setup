@@ -1,5 +1,5 @@
 use std::{
-    fs::File,
+    fs::OpenOptions,
     io::{Cursor, Write},
     path::PathBuf,
 };
@@ -28,7 +28,11 @@ impl Command for ApkArgs {
         match self.action {
             ApkAction::Patch { path } => {
                 println!("Patching APK from path: {path:?}");
-                let apk_file = File::open(&path).context("")?;
+                let apk_file = OpenOptions::new()
+                    .write(true)
+                    .read(true)
+                    .open(&path)
+                    .context("")?;
                 let mut apk = mbf_zip::ZipFile::open(apk_file)
                     .map_err(|a| color_eyre::eyre::eyre!(a))
                     .context("Failed to read APK as zip file")?;
