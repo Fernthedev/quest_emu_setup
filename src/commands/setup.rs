@@ -102,6 +102,7 @@ pub fn create_emulator() -> Result<(), color_eyre::eyre::Error> {
 pub fn install_tools(sdk_manager: &PathBuf) -> Result<(), color_eyre::eyre::Error> {
     let status = std::process::Command::new(sdk_manager)
         .arg("emulator")
+        .arg("platform-tools")
         .arg("system-images;android-33;android-desktop;x86_64")
         .status()
         .context("Failed to run sdkmanager")?;
