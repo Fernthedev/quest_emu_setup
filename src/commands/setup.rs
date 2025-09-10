@@ -61,11 +61,16 @@ impl Command for SetupArgs {
             }
         }
 
-        let android_emu_image = ctx.yes
+        let android_emu_image_installed = constants::emulator_path().exists()
+            && constants::android_sdk_path().join("platform-tools").join("adb").exists()
+            && constants::android_sdk_path().join(self.system_image.replace(";", "/")).exists();
+
+        let android_emu_image = !android_emu_image_installed
+            && (ctx.yes
             || self.install_emulator
             || dialoguer::Confirm::new()
                 .with_prompt("Do you want to install the Android Emulator and system image?")
-                .interact()?;
+                .interact()?);
         if android_emu_image {
             install_tools(&sdk_manager, &self.system_image)?;
         }
