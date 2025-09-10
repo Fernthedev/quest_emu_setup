@@ -12,6 +12,10 @@ pub const ANDROID_SDK_TOOLS: &str =
 pub const ANDROID_SDK_TOOLS: &str =
     "https://dl.google.com/android/repository/commandlinetools-win-13114758_latest.zip";
 
+pub const DEFAULT_AVD_NAME: &str = "android13desktop";
+
+pub const DEFAULT_AVD_IMAGE: &str = "system-images;android-33;android-desktop;x86_64";
+
 pub fn android_sdk_path() -> PathBuf {
     std::env::var("ANDROID_SDK_ROOT")
         .or_else(|_| env::var("ANDROID_HOME"))
@@ -50,6 +54,17 @@ pub fn avdmanager_path() -> PathBuf {
         path.set_extension("bat");
     }
     path
+}
+
+pub fn avd_path() -> PathBuf {
+    std::env::var("ANDROID_AVD_HOME")
+        .ok()
+        .map(PathBuf::from)
+        .or_else(|| {
+            let home = dirs::home_dir()?;
+            Some(home.join(".android").join("avd"))
+        })
+        .expect("Could not find Android AVD path. Please set ANDROID_AVD_HOME environment variable.")
 }
 
 pub fn emulator_path() -> PathBuf {
