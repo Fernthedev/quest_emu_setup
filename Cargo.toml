@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-default = ["reqwest", "clap"]
-ureq = []
+default = ["ureq", "clap"]
+ureq = ["dep:ureq"]
 reqwest = ["dep:reqwest"]
 clap = []
 
@@ -19,11 +19,12 @@ pbr = { version = "*" } #{ git = "https://github.com/a8m/pb.git" }
 bytes = "*"
 reqwest = { version = "0.12", features = [
     "blocking",
-    "json",
     "gzip",
     "deflate",
     "rustls-tls",
 ], default-features = false, optional = true}
+
+ureq = { version = "3", features = ["socks-proxy", "charset", "gzip"], optional = true}
 
 # For APKs, the zip crate doesn't align the way V2 signature for Android requires. We use Laurie's amazing work here.
 mbf-zip = { git = "https://github.com/Lauriethefish/ModsBeforeFriday.git", package = "mbf-zip", branch = "main" }

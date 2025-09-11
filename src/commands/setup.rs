@@ -157,13 +157,11 @@ pub fn install_tools(sdk_manager: &PathBuf, image: &str) -> Result<(), color_eyr
 }
 
 pub fn setup_sdk_manager() -> color_eyre::Result<()> {
-    let client = reqwest::blocking::Client::new();
-
     println!("Android SDK Tools not found, downloading...");
     println!("Adding to path: {}", android_sdk_path().display());
 
     let mut zip_tmp = BytesMut::new().writer();
-    downloader::download_with_progress(&client, ANDROID_SDK_TOOLS, &mut zip_tmp)
+    downloader::download_with_progress(None, ANDROID_SDK_TOOLS, &mut zip_tmp)
         .context("Failed to download Android SDK Tools")?;
 
     let zip_cursor = Cursor::new(zip_tmp.into_inner());
