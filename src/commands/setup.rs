@@ -39,6 +39,10 @@ pub struct SetupArgs {
     #[arg(long = "screen-size", default_value = "1920x1080")]
     screen_size: String,
 
+    /// Limit the emulator FPS to save CPU/GPU resources (0 = unlimited)
+    #[arg(long = "fps", default_value_t = 60)]
+    fps_limit: u32,
+
     /// System image of AVD (Android Virtual Device)
     #[arg(long = "image", default_value_t = constants::DEFAULT_AVD_IMAGE.to_string())]
     system_image: String,
@@ -106,7 +110,12 @@ impl Command for SetupArgs {
                 .with_prompt("Do you want to create an AVD (Android Virtual Device)?")
                 .interact()?;
         if create_avd {
-            create_emulator_with_screen_size(&self.name, &self.system_image, &self.screen_size)?;
+            create_emulator_with_screen_size(
+                &self.name,
+                &self.system_image,
+                &self.screen_size,
+                self.fps_limit,
+            )?;
             println!("Run the emulator using the 'emulator @{}'", self.name);
         }
 
@@ -144,6 +153,7 @@ pub fn create_emulator_with_screen_size(
     name: &str,
     image: &str,
     screen_size: &str,
+    fps: u32,
 ) -> Result<(), color_eyre::eyre::Error> {
     // Create the AVD first
     create_emulator(name, image)?;
@@ -164,6 +174,9 @@ pub fn create_emulator_with_screen_size(
             "hw.lcd.height={}",
             screen_size.split('x').nth(1).unwrap_or("1920")
         )?;
+        writeln!(config, "hw.lcd.vsync={fps}")?;
+        writeln!(config, "hw.gpu.enabled=yes")?;
+        writeln!(config, "hw.gpu.mode=auto")?;
     }
     Ok(())
 }
