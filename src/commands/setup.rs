@@ -35,6 +35,10 @@ pub struct SetupArgs {
     #[arg(long, default_value_t = constants::DEFAULT_AVD_NAME.to_string())]
     name: String,
 
+    /// Screen size for the AVD (Android Virtual Device), e.g. "1920x1080"
+    #[arg(long = "screen-size", default_value = "1920x1080")]
+    screen_size: String,
+
     /// System image of AVD (Android Virtual Device)
     #[arg(long = "image", default_value_t = constants::DEFAULT_AVD_IMAGE.to_string())]
     system_image: String,
@@ -102,8 +106,7 @@ impl Command for SetupArgs {
                 .with_prompt("Do you want to create an AVD (Android Virtual Device)?")
                 .interact()?;
         if create_avd {
-            create_emulator(&self.name, &self.system_image)?;
-
+            create_emulator_with_screen_size(&self.name, &self.system_image, &self.screen_size)?;
             println!("Run the emulator using the 'emulator @{}'", self.name);
         }
 
@@ -133,6 +136,35 @@ pub fn create_emulator(name: &str, image: &str) -> Result<(), color_eyre::eyre::
     if !status.success() {
         bail!("avdmanager exited with status: {}", status);
     };
+    Ok(())
+}
+
+/// Create an emulator with a specific screen size (e.g. "1080x1920")
+pub fn create_emulator_with_screen_size(
+    name: &str,
+    image: &str,
+    screen_size: &str,
+) -> Result<(), color_eyre::eyre::Error> {
+    // Create the AVD first
+    create_emulator(name, image)?;
+    // Set the screen size in config.ini
+    let avd_dir = avd_path().join(format!("{}.avd", name));
+    let config_path = avd_dir.join("config.ini");
+    if config_path.exists() {
+        use std::fs;
+        use std::io::Write;
+        let mut config = fs::OpenOptions::new().append(true).open(&config_path)?;
+        writeln!(
+            config,
+            "hw.lcd.width={}",
+            screen_size.split('x').next().unwrap_or("1080")
+        )?;
+        writeln!(
+            config,
+            "hw.lcd.height={}",
+            screen_size.split('x').nth(1).unwrap_or("1920")
+        )?;
+    }
     Ok(())
 }
 
