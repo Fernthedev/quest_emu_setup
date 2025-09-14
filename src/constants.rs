@@ -64,7 +64,9 @@ pub fn avd_path() -> PathBuf {
             let home = dirs::home_dir()?;
             Some(home.join(".android").join("avd"))
         })
-        .expect("Could not find Android AVD path. Please set ANDROID_AVD_HOME environment variable.")
+        .expect(
+            "Could not find Android AVD path. Please set ANDROID_AVD_HOME environment variable.",
+        )
 }
 
 pub fn emulator_path() -> PathBuf {

@@ -58,7 +58,7 @@ pub fn download_with_progress(
     url: &str,
     dest: &mut impl Write,
 ) -> io::Result<()> {
-    use ureq::{http::header::CONTENT_LENGTH, Agent};
+    use ureq::{Agent, http::header::CONTENT_LENGTH};
 
     use std::sync::LazyLock;
     static AGENT: LazyLock<Agent> = LazyLock::new(ureq::Agent::new_with_defaults);

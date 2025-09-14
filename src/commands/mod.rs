@@ -1,5 +1,5 @@
-pub mod setup;
 pub mod apk;
+pub mod setup;
 
 pub struct GlobalContext {
     pub yes: bool,

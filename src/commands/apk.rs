@@ -1,8 +1,4 @@
-use std::{
-    fs::OpenOptions,
-    io::{Cursor, Write},
-    path::PathBuf,
-};
+use std::{fs::OpenOptions, io::Cursor, path::PathBuf};
 
 // use bytes::{BufMut, Bytes, BytesMut};
 use color_eyre::eyre::{Context, bail};
@@ -22,6 +18,7 @@ pub enum ApkAction {
     Patch { path: PathBuf },
 }
 const MANIFEST_FILE: &str = "AndroidManifest.xml";
+const CERT_PEM: &[u8] = include_bytes!("../debug_cert.pem");
 
 impl Command for ApkArgs {
     fn execute(self, _ctx: &crate::commands::GlobalContext) -> color_eyre::Result<()> {
@@ -37,18 +34,16 @@ impl Command for ApkArgs {
                     .map_err(|a| color_eyre::eyre::eyre!(a))
                     .context("Failed to read APK as zip file")?;
 
-                // Step 1: Extract and decode manifest
                 let manifest_bytes = apk
                     .read_file(MANIFEST_FILE)
                     .map_err(|a| color_eyre::eyre::eyre!(a))
                     .context("Failed to read AndroidManifest.xml from APK")?;
                 let axml_bytes = patch_manifest(manifest_bytes)?;
-                // Step 4: Write back to APK
+
                 let mut axml_cursor = Cursor::new(axml_bytes);
                 apk.write_file(MANIFEST_FILE, &mut axml_cursor, FileCompression::Store)
                     .map_err(|a| color_eyre::eyre::eyre!(a))
                     .context("Failed to write modified AndroidManifest.xml back to APK")?;
-                const CERT_PEM: &[u8] = include_bytes!("../debug_cert.pem");
                 let (cert, priv_key) = mbf_zip::signing::load_cert_and_priv_key(CERT_PEM);
                 apk.save_and_sign_v2(&priv_key, &cert)
                     .map_err(|a| color_eyre::eyre::eyre!(a))

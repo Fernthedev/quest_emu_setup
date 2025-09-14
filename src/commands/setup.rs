@@ -5,7 +5,9 @@ use color_eyre::eyre::{Context, bail};
 
 use crate::{
     commands::{Command, GlobalContext},
-    constants::{self, ANDROID_SDK_TOOLS, android_sdk_path, cmdline_tools_path, emulator_path, avd_path},
+    constants::{
+        self, ANDROID_SDK_TOOLS, android_sdk_path, avd_path, cmdline_tools_path, emulator_path,
+    },
     downloader,
 };
 
@@ -62,15 +64,20 @@ impl Command for SetupArgs {
         }
 
         let android_emu_image_installed = constants::emulator_path().exists()
-            && constants::android_sdk_path().join("platform-tools").join("adb").exists()
-            && constants::android_sdk_path().join(self.system_image.replace(";", "/")).exists();
+            && constants::android_sdk_path()
+                .join("platform-tools")
+                .join("adb")
+                .exists()
+            && constants::android_sdk_path()
+                .join(self.system_image.replace(";", "/"))
+                .exists();
 
         let android_emu_image = !android_emu_image_installed
             && (ctx.yes
-            || self.install_emulator
-            || dialoguer::Confirm::new()
-                .with_prompt("Do you want to install the Android Emulator and system image?")
-                .interact()?);
+                || self.install_emulator
+                || dialoguer::Confirm::new()
+                    .with_prompt("Do you want to install the Android Emulator and system image?")
+                    .interact()?);
         if android_emu_image {
             install_tools(&sdk_manager, &self.system_image)?;
         }
@@ -96,9 +103,10 @@ impl Command for SetupArgs {
                 .interact()?;
         if create_avd {
             create_emulator(&self.name, &self.system_image)?;
+
+            println!("Run the emulator using the 'emulator @{}'", self.name);
         }
 
-        println!("Setup complete! You can now run the emulator using the 'emulator' command.");
         println!(
             "Add {} to your PATH.",
             sdk_manager.parent().unwrap().display()
@@ -122,7 +130,7 @@ pub fn create_emulator(name: &str, image: &str) -> Result<(), color_eyre::eyre::
         .arg(image)
         .status()
         .context("Failed to create AVD (Android Virtual Device)")?;
-    let _: () = if !status.success() {
+    if !status.success() {
         bail!("avdmanager exited with status: {}", status);
     };
     Ok(())
