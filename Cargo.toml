@@ -1,5 +1,5 @@
 [package]
-name = "quest_emu_setup"
+name = "quest_emu" #QEMU!
 version = "0.1.0"
 edition = "2024"
 
