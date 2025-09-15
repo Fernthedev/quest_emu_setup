@@ -76,7 +76,11 @@ impl Command for CreateArgs {
                 &self.screen_size,
                 self.fps_limit,
             )?;
-            println!("Run the emulator using the 'emulator @{}'", self.name);
+            println!(
+                "Run the emulator using the '{} start --name {}'",
+                std::env::var("CARGO_BIN_NAME").unwrap_or_else(|_| "quest_emu".to_string()),
+                self.name
+            );
         }
 
         Ok(())
