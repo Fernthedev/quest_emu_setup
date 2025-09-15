@@ -4,14 +4,12 @@ use bytes::{BufMut, BytesMut};
 use color_eyre::eyre::{Context, bail};
 
 use crate::{
-    commands::{Command, GlobalContext},
-    constants::{
-        self, ANDROID_SDK_TOOLS, android_sdk_path, avd_path, cmdline_tools_path, emulator_path,
-    },
+    commands::Command,
+    constants::{self, ANDROID_SDK_TOOLS, android_sdk_path, cmdline_tools_path, emulator_path},
     downloader,
 };
 
-#[derive(clap::Parser)]
+#[derive(clap::Args)]
 pub struct SetupArgs {
     /// Install the Android SDK tools
     /// This includes the SDK Manager, platform tools, and build tools
@@ -23,37 +21,17 @@ pub struct SetupArgs {
     #[arg(long = "emulator", default_value_t = false)]
     install_emulator: bool,
 
-    /// Create an AVD (Android Virtual Device)
-    #[arg(long = "avd", default_value_t = false)]
-    create_avd: bool,
-
-    /// Overwrite existing AVD (Android Virtual Device)
-    #[arg(long = "overwrite", default_value_t = false)]
-    overwrite_avd: bool,
-
-    /// Name of AVD (Android Virtual Device)
-    #[arg(long, default_value_t = constants::DEFAULT_AVD_NAME.to_string())]
-    name: String,
-
-    /// Screen size for the AVD (Android Virtual Device), e.g. "1920x1080"
-    #[arg(long = "screen-size", default_value = "1920x1080")]
-    screen_size: String,
-
-    /// Limit the emulator FPS to save CPU/GPU resources (0 = unlimited)
-    #[arg(long = "fps", default_value_t = 60)]
-    fps_limit: u32,
+    /// Path to the Android SDK Manager
+    #[arg(long)]
+    sdk_manager_path: Option<PathBuf>,
 
     /// System image of AVD (Android Virtual Device)
     #[arg(long = "image", default_value_t = constants::DEFAULT_AVD_IMAGE.to_string())]
     system_image: String,
-
-    /// Path to the Android SDK Manager
-    #[arg(long)]
-    sdk_manager_path: Option<PathBuf>,
 }
 
 impl Command for SetupArgs {
-    fn execute(self, ctx: &GlobalContext) -> color_eyre::Result<()> {
+    fn execute(self, ctx: &crate::commands::GlobalContext) -> color_eyre::Result<()> {
         let sdk_manager = constants::sdkmanager_path();
 
         println!("Using Android SDK path: {}", android_sdk_path().display());
@@ -90,35 +68,6 @@ impl Command for SetupArgs {
             install_tools(&sdk_manager, &self.system_image)?;
         }
 
-        let mut avd_folder_name = self.name.clone();
-        avd_folder_name.push_str(".avd");
-        if avd_path().join(&avd_folder_name).exists() {
-            let overwrite_avd = (ctx.yes || self.overwrite_avd)
-                || dialoguer::Confirm::new()
-                    .with_prompt("An existing AVD (Android Virtual Device) was found, do you want to delete this?")
-                    .interact()?;
-
-            match overwrite_avd {
-                true => delete_emulator(&self.name)?,
-                false => bail!("An existing AVD (Android Virtual Device) was found!"),
-            }
-        }
-
-        let create_avd = ctx.yes
-            || self.create_avd
-            || dialoguer::Confirm::new()
-                .with_prompt("Do you want to create an AVD (Android Virtual Device)?")
-                .interact()?;
-        if create_avd {
-            create_emulator_with_screen_size(
-                &self.name,
-                &self.system_image,
-                &self.screen_size,
-                self.fps_limit,
-            )?;
-            println!("Run the emulator using the 'emulator @{}'", self.name);
-        }
-
         println!(
             "Add {} to your PATH.",
             sdk_manager.parent().unwrap().display()
@@ -130,70 +79,6 @@ impl Command for SetupArgs {
 
         Ok(())
     }
-}
-
-pub fn create_emulator(name: &str, image: &str) -> Result<(), color_eyre::eyre::Error> {
-    let status = std::process::Command::new(constants::avdmanager_path())
-        .arg("create")
-        .arg("avd")
-        .arg("-n")
-        .arg(name)
-        .arg("-k")
-        .arg(image)
-        .status()
-        .context("Failed to create AVD (Android Virtual Device)")?;
-    if !status.success() {
-        bail!("avdmanager exited with status: {}", status);
-    };
-    Ok(())
-}
-
-/// Create an emulator with a specific screen size (e.g. "1080x1920")
-pub fn create_emulator_with_screen_size(
-    name: &str,
-    image: &str,
-    screen_size: &str,
-    fps: u32,
-) -> Result<(), color_eyre::eyre::Error> {
-    // Create the AVD first
-    create_emulator(name, image)?;
-    // Set the screen size in config.ini
-    let avd_dir = avd_path().join(format!("{}.avd", name));
-    let config_path = avd_dir.join("config.ini");
-    if config_path.exists() {
-        use std::fs;
-        use std::io::Write;
-        let mut config = fs::OpenOptions::new().append(true).open(&config_path)?;
-        writeln!(
-            config,
-            "hw.lcd.width={}",
-            screen_size.split('x').next().unwrap_or("1080")
-        )?;
-        writeln!(
-            config,
-            "hw.lcd.height={}",
-            screen_size.split('x').nth(1).unwrap_or("1920")
-        )?;
-        writeln!(config, "hw.lcd.vsync={fps}")?;
-        writeln!(config, "hw.gpu.enabled=yes")?;
-        writeln!(config, "hw.gpu.mode=auto")?;
-    }
-    Ok(())
-}
-
-pub fn delete_emulator(name: &str) -> Result<(), color_eyre::eyre::Error> {
-    let status = std::process::Command::new(constants::avdmanager_path())
-        .arg("delete")
-        .arg("avd")
-        .arg("-n")
-        .arg(name)
-        .status()
-        .context("Failed to delete AVD (Android Virtual Device)")?;
-
-    if !status.success() {
-        bail!("avdmanager exited with status: {}", status);
-    }
-    Ok(())
 }
 
 pub fn install_tools(sdk_manager: &PathBuf, image: &str) -> Result<(), color_eyre::eyre::Error> {

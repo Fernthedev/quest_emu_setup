@@ -42,7 +42,10 @@ impl Command for StartArgs {
             command.args(self.args);
         }
 
-        println!("emulator {}", command.get_args().map(|s| s.display()).join(" "));
+        println!(
+            "emulator {}",
+            command.get_args().map(|s| s.display()).join(" ")
+        );
 
         let status = command.status().context("Failed to start emulator")?;
 
