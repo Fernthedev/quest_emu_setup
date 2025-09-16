@@ -1,8 +1,10 @@
 use std::{fs::OpenOptions, io::Cursor, path::PathBuf};
 
 // use bytes::{BufMut, Bytes, BytesMut};
-use color_eyre::eyre::{Context, bail};
+use color_eyre::eyre::{Context, ContextCompat, bail, eyre};
+use mbf_res_man::version_grabber;
 use mbf_zip::FileCompression;
+use semver::Version;
 
 use crate::commands::Command;
 use mbf_axml::{AxmlReader, AxmlWriter, axml_to_xml, xml_to_axml};
@@ -15,7 +17,25 @@ pub struct ApkArgs {
 
 #[derive(clap::Subcommand, Debug)]
 pub enum ApkAction {
-    Patch { path: PathBuf },
+    Download {
+        /// Oculus auth token, can be found in the browser devtools when logged in to oculus.com
+        #[arg(long)]
+        token: String,
+        /// The ID of the APK to download, e.g. "com.beatgames.beatsaber" is 2448060205267927
+        #[arg(long, default_value = "2448060205267927")]
+        graph_app_id: String,
+        /// The version of the APK to download, e.g. "1.0.0"
+        version: String,
+
+        /// Output path, defaults to current directory
+        output: Option<PathBuf>,
+
+        #[arg(long, default_value_t = true)]
+        patch: bool,
+    },
+    Patch {
+        path: PathBuf,
+    },
 }
 const MANIFEST_FILE: &str = "AndroidManifest.xml";
 const CERT_PEM: &[u8] = include_bytes!("../debug_cert.pem");
@@ -24,35 +44,74 @@ impl Command for ApkArgs {
     fn execute(self, _ctx: &crate::commands::GlobalContext) -> color_eyre::Result<()> {
         match self.action {
             ApkAction::Patch { path } => {
-                println!("Patching APK from path: {path:?}");
-                let apk_file = OpenOptions::new()
-                    .write(true)
-                    .read(true)
-                    .open(&path)
-                    .context("")?;
-                let mut apk = mbf_zip::ZipFile::open(apk_file)
-                    .map_err(|a| color_eyre::eyre::eyre!(a))
-                    .context("Failed to read APK as zip file")?;
+                do_patch(path)?;
+            }
+            ApkAction::Download {
+                token,
+                graph_app_id: apk_graph_id,
+                version,
+                output,
+                patch,
+            } => {
+                let versions = version_grabber::get_live_versions(
+                    &token,
+                    Version::new(0, 0, 0),
+                    &apk_graph_id,
+                )
+                .map_err(|e| eyre!(e))?;
 
-                let manifest_bytes = apk
-                    .read_file(MANIFEST_FILE)
-                    .map_err(|a| color_eyre::eyre::eyre!(a))
-                    .context("Failed to read AndroidManifest.xml from APK")?;
-                let axml_bytes = patch_manifest(manifest_bytes)?;
+                println!("Downloading {} version {}", apk_graph_id, version);
 
-                let mut axml_cursor = Cursor::new(axml_bytes);
-                apk.write_file(MANIFEST_FILE, &mut axml_cursor, FileCompression::Store)
-                    .map_err(|a| color_eyre::eyre::eyre!(a))
-                    .context("Failed to write modified AndroidManifest.xml back to APK")?;
-                let (cert, priv_key) = mbf_zip::signing::load_cert_and_priv_key(CERT_PEM);
-                apk.save_and_sign_v2(&priv_key, &cert)
-                    .map_err(|a| color_eyre::eyre::eyre!(a))
-                    .context("Failed to save modified APK")?;
-                println!("Successfully patched AndroidManifest.xml");
+                let output = output.unwrap_or("./apk".into());
+                let downloaded = version_grabber::download_version(
+                    &token, &versions, &version, false, &output, false,
+                )
+                .map_err(|e| eyre!(e))?
+                .context("Version not found")?;
+
+                println!("Downloaded {} version {}", apk_graph_id, version);
+                match patch {
+                    true => {
+                        println!("Patching APK");
+                        do_patch(output.join(format!("{}.apk", downloaded.main.id)))?
+                    },
+                    false => {
+                        println!(
+                            "You may need to patch the APK to work in the emulator using `apk patch`",
+                        );
+                    }
+                }
             }
         }
         Ok(())
     }
+}
+
+fn do_patch(path: PathBuf) -> Result<(), color_eyre::eyre::Error> {
+    println!("Patching APK from path: {path:?}");
+    let apk_file = OpenOptions::new()
+        .write(true)
+        .read(true)
+        .open(&path)
+        .context("")?;
+    let mut apk = mbf_zip::ZipFile::open(apk_file)
+        .map_err(|a| color_eyre::eyre::eyre!(a))
+        .context("Failed to read APK as zip file")?;
+    let manifest_bytes = apk
+        .read_file(MANIFEST_FILE)
+        .map_err(|a| color_eyre::eyre::eyre!(a))
+        .context("Failed to read AndroidManifest.xml from APK")?;
+    let axml_bytes = patch_manifest(manifest_bytes)?;
+    let mut axml_cursor = Cursor::new(axml_bytes);
+    apk.write_file(MANIFEST_FILE, &mut axml_cursor, FileCompression::Store)
+        .map_err(|a| color_eyre::eyre::eyre!(a))
+        .context("Failed to write modified AndroidManifest.xml back to APK")?;
+    let (cert, priv_key) = mbf_zip::signing::load_cert_and_priv_key(CERT_PEM);
+    apk.save_and_sign_v2(&priv_key, &cert)
+        .map_err(|a| color_eyre::eyre::eyre!(a))
+        .context("Failed to save modified APK")?;
+    println!("Successfully patched AndroidManifest.xml");
+    Ok(())
 }
 
 /// AI generated code to patch the manifest
