@@ -73,7 +73,7 @@ impl Command for ApkArgs {
                 match patch {
                     true => {
                         println!("Patching APK");
-                        do_patch(output.join(format!("{}.apk", downloaded.main.id)))?
+                        do_patch(output.join(&downloaded.main.version).join(format!("{}.apk", downloaded.main.id)))?
                     },
                     false => {
                         println!(
