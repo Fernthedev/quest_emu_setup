@@ -47,7 +47,6 @@ jobs:
 
       - name: Build (release)
         run: |
-          set -e
           # Build with the host's default toolchain (native build)
           cargo build --release
 
