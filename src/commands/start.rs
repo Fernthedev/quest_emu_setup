@@ -3,7 +3,7 @@ use std::process;
 use color_eyre::eyre::{Context, bail};
 use itertools::Itertools;
 
-use crate::{commands::Command, constants};
+use crate::{commands::Command, constants::{self, emulator_path}};
 
 #[derive(clap::Parser, Debug)]
 pub struct StartArgs {
@@ -26,7 +26,7 @@ impl Command for StartArgs {
 
         println!("Starting emulator with AVD name: {}", self.name);
 
-        let mut command = process::Command::new("emulator");
+        let mut command = process::Command::new(emulator_path());
         command
             .arg(format!("@{}", self.name))
             .arg("-selinux")
@@ -43,7 +43,8 @@ impl Command for StartArgs {
         }
 
         println!(
-            "emulator {}",
+            "{} {}",
+            emulator_path().to_string_lossy(),
             command.get_args().map(|s| s.display()).join(" ")
         );
 
