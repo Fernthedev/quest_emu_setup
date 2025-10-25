@@ -6,7 +6,10 @@ use mbf_res_man::version_grabber;
 use mbf_zip::FileCompression;
 use semver::Version;
 
-use crate::commands::Command;
+use crate::{
+    commands::Command,
+    constants,
+};
 use mbf_axml::{AxmlReader, AxmlWriter, axml_to_xml, xml_to_axml};
 
 #[derive(clap::Parser, Debug)]
@@ -32,6 +35,10 @@ pub enum ApkAction {
 
         #[arg(long, default_value_t = true)]
         patch: bool,
+
+        /// Installs APK after download
+        #[arg(long, default_value_t = false)]
+        install: bool,
     },
     Patch {
         path: PathBuf,
@@ -52,6 +59,7 @@ impl Command for ApkArgs {
                 version,
                 output,
                 patch,
+                install,
             } => {
                 let versions = version_grabber::get_live_versions(
                     &token,
@@ -68,18 +76,53 @@ impl Command for ApkArgs {
                 )
                 .map_err(|e| eyre!(e))?
                 .context("Version not found")?;
+                let version_folder = output.join(&downloaded.main.version);
 
                 println!("Downloaded {} version {}", apk_graph_id, version);
                 match patch {
                     true => {
                         println!("Patching APK");
-                        do_patch(output.join(format!("{}.apk", downloaded.main.id)))?
+                        do_patch(version_folder.join(format!("{}.apk", &downloaded.main.id)))?
                     },
                     false => {
                         println!(
                             "You may need to patch the APK to work in the emulator using `apk patch`",
                         );
                     }
+                }
+
+                if install {
+                    println!("Installing APK");
+                    let adb_path = constants::android_sdk_path()
+                        .join("platform-tools")
+                        .join("adb");
+
+                    std::process::Command::new(&adb_path)
+                        .arg("install")
+                        .arg(&version_folder.join(format!("{}.apk", downloaded.main.id)))
+                        .status()
+                        .context("Failed to install APK")?;
+                    
+                    let obb_binary = version_folder.join(format!("main.{}.com.beatgames.beatsaber.obb", downloaded.main.version_code));
+                    if obb_binary.exists() {
+                        std::process::Command::new(&adb_path)
+                            .arg("shell")
+                            .arg("mkdir")
+                            .arg("-p")
+                            .arg("/sdcard/Android/obb/com.beatgames.beatsaber")
+                            .status()
+                            .context("Failed to create obb directory")?;
+
+                        std::process::Command::new(&adb_path)
+                            .arg("push")
+                            .arg(&obb_binary)
+                            .arg("/sdcard/Android/obb/com.beatgames.beatsaber")
+                            .status()
+                            .context("Failed to copy obb")?;
+                    }
+
+                    std::fs::remove_dir_all(&output).context("Failed to remove apk directory")?;
+                    println!("Successfully installed APK");
                 }
             }
         }
