@@ -1,17 +1,20 @@
 name: CI Build & Release
 
+permissions:
+  contents: write
+
 on:
-    push:
-        # Run on version tags like v1.2.3 and on any branch commits
-        branches:
-            - 'master'
-            - 'main'
-        tags:
-            - 'v*'
-    pull_request:
-        branches: 
-            - 'master'
-            - 'main'
+  push:
+    # Run on version tags like v1.2.3 and on any branch commits
+    branches:
+      - "master"
+      - "main"
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - "master"
+      - "main"
 
 jobs:
   build:
@@ -22,10 +25,10 @@ jobs:
         include:
           - runner: ubuntu-latest
             os_name: linux-x64
-            ext: ''
+            ext: ""
           - runner: macos-latest
             os_name: macos-arm64
-            ext: ''
+            ext: ""
           - runner: windows-latest
             os_name: windows-x64
             ext: .exe
@@ -49,8 +52,7 @@ jobs:
         run: |
           # Build with the host's default toolchain (native build)
           cargo build --release
-          ls ./target/release 
-
+          ls ./target/release
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
