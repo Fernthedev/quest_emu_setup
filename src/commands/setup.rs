@@ -5,7 +5,9 @@ use color_eyre::eyre::{Context, bail};
 
 use crate::{
     commands::Command,
-    constants::{self, ANDROID_SDK_TOOLS, android_sdk_path, cmdline_tools_path, emulator_path},
+    constants::{
+        self, ANDROID_SDK_TOOLS, adb_path, android_sdk_path, cmdline_tools_path, emulator_path,
+    },
     downloader,
 };
 
@@ -50,10 +52,7 @@ impl Command for SetupArgs {
         }
 
         let android_emu_image_installed = constants::emulator_path().exists()
-            && constants::android_sdk_path()
-                .join("platform-tools")
-                .join("adb")
-                .exists()
+            && adb_path().exists()
             && constants::android_sdk_path()
                 .join(self.system_image.replace(";", "/"))
                 .exists();

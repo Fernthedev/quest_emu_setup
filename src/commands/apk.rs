@@ -10,7 +10,7 @@ use mbf_res_man::version_grabber;
 use mbf_zip::FileCompression;
 use semver::Version;
 
-use crate::{commands::Command, constants};
+use crate::{commands::Command, constants::{self, adb_path}};
 use mbf_axml::{AxmlReader, AxmlWriter, axml_to_xml, xml_to_axml};
 
 #[derive(clap::Parser, Debug)]
@@ -159,9 +159,7 @@ fn do_install(
     obb_binary: &Path,
 ) -> Result<(), color_eyre::eyre::Error> {
     println!("Installing APK");
-    let adb_path = constants::android_sdk_path()
-        .join("platform-tools")
-        .join("adb");
+    let adb_path = adb_path();
 
     std::process::Command::new(&adb_path)
         .arg("install")

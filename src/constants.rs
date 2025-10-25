@@ -78,3 +78,13 @@ pub fn emulator_path() -> PathBuf {
     }
     path
 }
+
+pub fn adb_path() -> PathBuf {
+    let mut path = android_sdk_path();
+    path.push("platform-tools");
+    path.push("adb");
+    if cfg!(target_os = "windows") {
+        path.set_extension("exe");
+    }
+    path
+}

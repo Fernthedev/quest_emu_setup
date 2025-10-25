@@ -2,7 +2,7 @@ use color_eyre::eyre::{Context, bail};
 
 use crate::{
     commands::{Command, GlobalContext},
-    constants::{self, avd_path},
+    constants::{self, adb_path, avd_path},
 };
 
 #[derive(clap::Parser)]
@@ -35,9 +35,7 @@ pub struct CreateArgs {
 impl Command for CreateArgs {
     fn execute(self, ctx: &GlobalContext) -> color_eyre::Result<()> {
         let android_emu_image_installed = constants::emulator_path().exists()
-            && constants::android_sdk_path()
-                .join("platform-tools")
-                .join("adb")
+            && adb_path()
                 .exists()
             && constants::android_sdk_path()
                 .join(self.system_image.replace(";", "/"))
