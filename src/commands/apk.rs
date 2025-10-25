@@ -121,21 +121,15 @@ impl Command for ApkArgs {
                     // 1) Try exact match
                     .iter()
                     .find_map(|(v, _)| {
-                        if v.non_semver == fuzzy_version {
-                            Some(&v.non_semver)
-                        } else {
-                            None
-                        }
+                        let exact = v.non_semver == fuzzy_version;
+                        exact.then_some(&v.non_semver)
                     })
                     // 2) If no exact match, try a fuzzy match (contains / contained-by)
                     .or_else(|| {
                         versions.iter().find_map(|(v, _)| {
                             let ns = &v.non_semver;
-                            if ns.contains(&fuzzy_version) || fuzzy_version.contains(ns) {
-                                Some(ns)
-                            } else {
-                                None
-                            }
+                            let matches = ns.contains(&fuzzy_version) || fuzzy_version.contains(ns);
+                            matches.then_some(ns)
                         })
                     })
                     // convert Option<&String> -> Option<&str> and fallback to the original input
@@ -163,7 +157,10 @@ impl Command for ApkArgs {
                     downloaded.main.version_code, downloaded.main.id,
                 ));
 
-                println!("Downloaded {} version {}", downloaded.main.id, fuzzy_version);
+                println!(
+                    "Downloaded {} version {}",
+                    downloaded.main.id, matching_version
+                );
                 match patch {
                     true => {
                         println!("Patching APK");
