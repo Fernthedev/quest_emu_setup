@@ -6,6 +6,9 @@ edition = "2024"
 [features]
 default = ["ureq", "clap"]
 ureq = ["dep:ureq"]
+
+# Use reqwest for HTTP requests
+# MBF-Agent uses ureq, so this will bloat the binary a bit.
 reqwest = ["dep:reqwest"]
 clap = []
 
