@@ -10,7 +10,10 @@ use mbf_res_man::version_grabber;
 use mbf_zip::FileCompression;
 use semver::Version;
 
-use crate::{commands::Command, constants::{self, adb_path}};
+use crate::{
+    commands::Command,
+    constants::{self, adb_path},
+};
 use mbf_axml::{AxmlReader, AxmlWriter, axml_to_xml, xml_to_axml};
 
 #[derive(clap::Parser, Debug)]
@@ -30,7 +33,7 @@ pub enum ApkAction {
         #[arg(long, default_value = "2448060205267927")]
         graph_app_id: String,
         /// The version of the APK to download, e.g. "1.0.0"
-        version: String,
+        fuzzy_version: String,
 
         /// Output path, defaults to current directory
         output: Option<PathBuf>,
@@ -102,7 +105,7 @@ impl Command for ApkArgs {
             ApkAction::Download {
                 token,
                 graph_app_id,
-                version,
+                fuzzy_version,
                 output,
                 patch,
                 install,
@@ -114,11 +117,41 @@ impl Command for ApkArgs {
                 )
                 .map_err(|e| eyre!(e))?;
 
-                println!("Downloading {} version {}", graph_app_id, version);
+                let matching_version: &str = versions
+                    // 1) Try exact match
+                    .iter()
+                    .find_map(|(v, _)| {
+                        if v.non_semver == fuzzy_version {
+                            Some(&v.non_semver)
+                        } else {
+                            None
+                        }
+                    })
+                    // 2) If no exact match, try a fuzzy match (contains / contained-by)
+                    .or_else(|| {
+                        versions.iter().find_map(|(v, _)| {
+                            let ns = &v.non_semver;
+                            if ns.contains(&fuzzy_version) || fuzzy_version.contains(ns) {
+                                Some(ns)
+                            } else {
+                                None
+                            }
+                        })
+                    })
+                    // convert Option<&String> -> Option<&str> and fallback to the original input
+                    .map(|s| s.as_str())
+                    .unwrap_or(&fuzzy_version);
+
+                println!("Downloading {} version {}", graph_app_id, matching_version);
 
                 let output = output.unwrap_or("./apk".into());
                 let downloaded = version_grabber::download_version(
-                    &token, &versions, &version, false, &output, false,
+                    &token,
+                    &versions,
+                    matching_version,
+                    false,
+                    &output,
+                    false,
                 )
                 .map_err(|e| eyre!(e))?
                 .context("Version not found")?;
@@ -130,7 +163,7 @@ impl Command for ApkArgs {
                     downloaded.main.version_code, downloaded.main.id,
                 ));
 
-                println!("Downloaded {} version {}", downloaded.main.id, version);
+                println!("Downloaded {} version {}", downloaded.main.id, fuzzy_version);
                 match patch {
                     true => {
                         println!("Patching APK");
