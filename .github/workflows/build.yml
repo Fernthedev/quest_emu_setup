@@ -69,8 +69,9 @@ jobs:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          path: release
+
       - name: Release Artifact Upload
         uses: softprops/action-gh-release@v1
         with:
-          files: artifacts/**/*
+          files: release/**/*
