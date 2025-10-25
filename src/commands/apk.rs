@@ -1,4 +1,8 @@
-use std::{fs::OpenOptions, io::Cursor, path::PathBuf};
+use std::{
+    fs::OpenOptions,
+    io::Cursor,
+    path::{Path, PathBuf},
+};
 
 // use bytes::{BufMut, Bytes, BytesMut};
 use color_eyre::eyre::{Context, ContextCompat, bail, eyre};
@@ -6,10 +10,7 @@ use mbf_res_man::version_grabber;
 use mbf_zip::FileCompression;
 use semver::Version;
 
-use crate::{
-    commands::Command,
-    constants,
-};
+use crate::{commands::Command, constants};
 use mbf_axml::{AxmlReader, AxmlWriter, axml_to_xml, xml_to_axml};
 
 #[derive(clap::Parser, Debug)]
@@ -20,6 +21,7 @@ pub struct ApkArgs {
 
 #[derive(clap::Subcommand, Debug)]
 pub enum ApkAction {
+    /// Download an APK from Oculus Graph and optionally patch and install it
     Download {
         /// Oculus auth token, can be found in the browser devtools when logged in to oculus.com
         #[arg(long)]
@@ -33,15 +35,28 @@ pub enum ApkAction {
         /// Output path, defaults to current directory
         output: Option<PathBuf>,
 
+        /// Patches the APK after download to work in the emulator
         #[arg(long, default_value_t = true)]
         patch: bool,
 
-        /// Installs APK after download
+        /// Installs APK and obb after download
         #[arg(long, default_value_t = false)]
         install: bool,
     },
+    /// Patch an APK to work in the emulator.
     Patch {
+        /// Path to the APK to patch
         path: PathBuf,
+    },
+    /// Install an APK and its OBB file to the emulator
+    Install {
+        /// The ID of the APK to install. E.g. "com.beatgames.beatsaber"
+        apk_id: String,
+        /// The folder where the APK and OBB files are located. Directory looks like:
+        /// <output_folder>/
+        ///     <apk_id>.apk
+        ///     main.<version_code>.<apk_id>.obb (optional)
+        folder_path: PathBuf,
     },
 }
 const MANIFEST_FILE: &str = "AndroidManifest.xml";
@@ -51,11 +66,42 @@ impl Command for ApkArgs {
     fn execute(self, _ctx: &crate::commands::GlobalContext) -> color_eyre::Result<()> {
         match self.action {
             ApkAction::Patch { path } => {
-                do_patch(path)?;
+                do_patch(&path)?;
+            }
+            ApkAction::Install {
+                apk_id,
+                folder_path,
+            } => {
+                let apk_path = folder_path.join(format!("{}.apk", &apk_id));
+                if !apk_path.exists() {
+                    bail!("APK file not found at path: {:?}", apk_path);
+                }
+
+                // Find the obb file if it exists
+                let obb_files: Vec<_> = std::fs::read_dir(&folder_path)?
+                    .filter_map(|entry| {
+                        let entry = entry.ok()?;
+                        let file_name = entry.file_name().to_string_lossy().to_string();
+                        if file_name.starts_with("main.")
+                            && file_name.ends_with(&format!(".{}", &apk_id))
+                        {
+                            Some(entry.path())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                let obb_path = obb_files
+                    .first()
+                    .cloned()
+                    .unwrap_or_else(|| folder_path.join(""));
+
+                do_install(&folder_path, &apk_id, &apk_path, &obb_path)?;
             }
             ApkAction::Download {
                 token,
-                graph_app_id: apk_graph_id,
+                graph_app_id,
                 version,
                 output,
                 patch,
@@ -64,11 +110,11 @@ impl Command for ApkArgs {
                 let versions = version_grabber::get_live_versions(
                     &token,
                     Version::new(0, 0, 0),
-                    &apk_graph_id,
+                    &graph_app_id,
                 )
                 .map_err(|e| eyre!(e))?;
 
-                println!("Downloading {} version {}", apk_graph_id, version);
+                println!("Downloading {} version {}", graph_app_id, version);
 
                 let output = output.unwrap_or("./apk".into());
                 let downloaded = version_grabber::download_version(
@@ -76,14 +122,20 @@ impl Command for ApkArgs {
                 )
                 .map_err(|e| eyre!(e))?
                 .context("Version not found")?;
-                let version_folder = output.join(&downloaded.main.version);
 
-                println!("Downloaded {} version {}", apk_graph_id, version);
+                let version_folder = output.join(&downloaded.main.version);
+                let apk_path = version_folder.join(format!("{}.apk", &downloaded.main.id));
+                let obb_path = version_folder.join(format!(
+                    "main.{}.{}.obb",
+                    downloaded.main.version_code, downloaded.main.id,
+                ));
+
+                println!("Downloaded {} version {}", downloaded.main.id, version);
                 match patch {
                     true => {
                         println!("Patching APK");
-                        do_patch(version_folder.join(format!("{}.apk", &downloaded.main.id)))?
-                    },
+                        do_patch(&apk_path)?
+                    }
                     false => {
                         println!(
                             "You may need to patch the APK to work in the emulator using `apk patch`",
@@ -92,37 +144,7 @@ impl Command for ApkArgs {
                 }
 
                 if install {
-                    println!("Installing APK");
-                    let adb_path = constants::android_sdk_path()
-                        .join("platform-tools")
-                        .join("adb");
-
-                    std::process::Command::new(&adb_path)
-                        .arg("install")
-                        .arg(&version_folder.join(format!("{}.apk", downloaded.main.id)))
-                        .status()
-                        .context("Failed to install APK")?;
-                    
-                    let obb_binary = version_folder.join(format!("main.{}.com.beatgames.beatsaber.obb", downloaded.main.version_code));
-                    if obb_binary.exists() {
-                        std::process::Command::new(&adb_path)
-                            .arg("shell")
-                            .arg("mkdir")
-                            .arg("-p")
-                            .arg("/sdcard/Android/obb/com.beatgames.beatsaber")
-                            .status()
-                            .context("Failed to create obb directory")?;
-
-                        std::process::Command::new(&adb_path)
-                            .arg("push")
-                            .arg(&obb_binary)
-                            .arg("/sdcard/Android/obb/com.beatgames.beatsaber")
-                            .status()
-                            .context("Failed to copy obb")?;
-                    }
-
-                    std::fs::remove_dir_all(&output).context("Failed to remove apk directory")?;
-                    println!("Successfully installed APK");
+                    do_install(&output, &downloaded.main.id, &apk_path, &obb_path)?;
                 }
             }
         }
@@ -130,12 +152,50 @@ impl Command for ApkArgs {
     }
 }
 
-fn do_patch(path: PathBuf) -> Result<(), color_eyre::eyre::Error> {
+fn do_install(
+    output: &Path,
+    apk_id: &str,
+    apk_path: &Path,
+    obb_binary: &Path,
+) -> Result<(), color_eyre::eyre::Error> {
+    println!("Installing APK");
+    let adb_path = constants::android_sdk_path()
+        .join("platform-tools")
+        .join("adb");
+
+    std::process::Command::new(&adb_path)
+        .arg("install")
+        .arg(apk_path)
+        .status()
+        .context("Failed to install APK")?;
+    if obb_binary.exists() {
+        let obb_device_path = format!("/sdcard/Android/obb/{}", apk_id);
+        std::process::Command::new(&adb_path)
+            .arg("shell")
+            .arg("mkdir")
+            .arg("-p")
+            .arg(&obb_device_path)
+            .status()
+            .context("Failed to create obb directory")?;
+
+        std::process::Command::new(&adb_path)
+            .arg("push")
+            .arg(obb_binary)
+            .arg(obb_device_path)
+            .status()
+            .context("Failed to copy obb")?;
+    }
+    std::fs::remove_dir_all(output).context("Failed to remove apk directory")?;
+    println!("Successfully installed APK");
+    Ok(())
+}
+
+fn do_patch(path: &Path) -> Result<(), color_eyre::eyre::Error> {
     println!("Patching APK from path: {path:?}");
     let apk_file = OpenOptions::new()
         .write(true)
         .read(true)
-        .open(&path)
+        .open(path)
         .context("")?;
     let mut apk = mbf_zip::ZipFile::open(apk_file)
         .map_err(|a| color_eyre::eyre::eyre!(a))
