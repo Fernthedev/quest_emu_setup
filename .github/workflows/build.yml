@@ -1,0 +1,77 @@
+name: CI Build & Release
+
+on:
+    push:
+        # Run on version tags like v1.2.3 and on any branch commits
+        branches:
+            - 'master'
+            - 'main'
+        tags:
+            - 'v*'
+    pull_request:
+        branches: 
+            - 'master'
+            - 'main'
+
+jobs:
+  build:
+    name: Build ${{ matrix.os_name }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            os_name: linux-x64
+            ext: ''
+          - runner: macos-latest
+            os_name: macos-arm64
+            ext: ''
+          - runner: windows-latest
+            os_name: windows-x64
+            ext: .exe
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          components: clippy
+
+      - name: Ensure rust toolchain
+        run: |
+          rustup default stable
+
+      - name: Build (release)
+        run: |
+          set -e
+          # Build with the host's default toolchain (native build)
+          cargo build --release
+
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: quest_emu_setup-${{ matrix.os_name }}${{ matrix.ext }}
+          path: release/quest_emu_setup${{ matrix.ext }}
+
+  create_release:
+    name: Create Release and Upload Assets
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Release Artifact Upload
+        uses: softprops/action-gh-release@v1
+        with:
+          files: artifacts/**/*
