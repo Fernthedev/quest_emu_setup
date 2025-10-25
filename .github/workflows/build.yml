@@ -55,7 +55,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: quest_emu_setup-${{ matrix.os_name }}${{ matrix.ext }}
-          path: release/quest_emu_setup${{ matrix.ext }}
+          path: target/release/quest_emu_setup${{ matrix.ext }}
+          if-no-files-found: error
 
   create_release:
     name: Create Release and Upload Assets
@@ -69,9 +70,9 @@ jobs:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
-          path: release
+          path: artifacts
 
       - name: Release Artifact Upload
         uses: softprops/action-gh-release@v1
         with:
-          files: release/**/*
+          files: artifacts/**/*
