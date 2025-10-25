@@ -55,8 +55,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: quest_emu_setup-${{ matrix.os_name }}${{ matrix.ext }}
-          path: target/release/quest_emu_setup${{ matrix.ext }}
+          name: quest_emu-${{ matrix.os_name }}${{ matrix.ext }}
+          path: target/release/quest_emu${{ matrix.ext }}
           if-no-files-found: error
 
   create_release:
