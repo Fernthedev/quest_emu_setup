@@ -44,6 +44,7 @@ jobs:
       - name: Ensure rust toolchain
         run: |
           rustup default stable
+          ls ./target/release 
 
       - name: Build (release)
         run: |
