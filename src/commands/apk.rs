@@ -6,6 +6,7 @@ use std::{
 
 // use bytes::{BufMut, Bytes, BytesMut};
 use color_eyre::eyre::{Context, ContextCompat, bail, eyre};
+use itertools::Itertools;
 use mbf_res_man::version_grabber;
 use mbf_zip::FileCompression;
 use semver::Version;
@@ -85,8 +86,7 @@ impl Command for ApkArgs {
                     .filter_map(|entry| {
                         let entry = entry.ok()?;
                         let file_name = entry.file_name().to_string_lossy().to_string();
-                        if file_name.starts_with("main.")
-                            && file_name.ends_with(&format!(".{}", &apk_id))
+                        if file_name.ends_with(".obb")
                         {
                             Some(entry.path())
                         } else {
@@ -97,10 +97,9 @@ impl Command for ApkArgs {
 
                 let obb_path = obb_files
                     .first()
-                    .cloned()
-                    .unwrap_or_else(|| folder_path.join(""));
+                    .cloned();
 
-                do_install(&folder_path, &apk_id, &apk_path, &obb_path)?;
+                do_install(&folder_path, &apk_path, obb_path.as_deref())?;
             }
             ApkAction::Download {
                 token,
@@ -152,10 +151,23 @@ impl Command for ApkArgs {
 
                 let version_folder = output.join(&downloaded.main.version);
                 let apk_path = version_folder.join(format!("{}.apk", &downloaded.main.id));
-                let obb_path = version_folder.join(format!(
-                    "main.{}.{}.obb",
-                    downloaded.main.version_code, downloaded.main.id,
-                ));
+
+                let obb_files: Vec<_> = std::fs::read_dir(&version_folder)?
+                    .filter_map(|entry| {
+                        let entry = entry.ok()?;
+                        let file_name = entry.file_name().to_string_lossy().to_string();
+                        if file_name.ends_with(".obb")
+                        {
+                            Some(entry.path())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                let obb_path = obb_files
+                    .first()
+                    .cloned();
 
                 println!(
                     "Downloaded {} version {}",
@@ -174,7 +186,7 @@ impl Command for ApkArgs {
                 }
 
                 if install {
-                    do_install(&output, &downloaded.main.id, &apk_path, &obb_path)?;
+                    do_install(&output, &apk_path, obb_path.as_deref())?;
                 }
             }
         }
@@ -184,9 +196,8 @@ impl Command for ApkArgs {
 
 fn do_install(
     output: &Path,
-    apk_id: &str,
     apk_path: &Path,
-    obb_binary: &Path,
+    obb_binary: Option<&Path>,
 ) -> Result<(), color_eyre::eyre::Error> {
     println!("Installing APK");
     let adb_path = adb_path();
@@ -196,8 +207,16 @@ fn do_install(
         .arg(apk_path)
         .status()
         .context("Failed to install APK")?;
-    if obb_binary.exists() {
-        let obb_device_path = format!("/sdcard/Android/obb/{}", apk_id);
+    if obb_binary.is_some_and(|o| o.exists()) {
+        let file_name = obb_binary.as_deref().unwrap().file_name().unwrap().to_string_lossy().to_string();
+        // Extract package name from filename main.{id}.{package_name}.obb
+        let package_name: String = file_name
+            .split('.')
+            .skip(2)
+            .take_while(|e| e != &"obb")
+            .join(".");
+
+        let obb_device_path = format!("/sdcard/Android/obb/{}", &package_name);
         std::process::Command::new(&adb_path)
             .arg("shell")
             .arg("mkdir")
@@ -208,7 +227,7 @@ fn do_install(
 
         std::process::Command::new(&adb_path)
             .arg("push")
-            .arg(obb_binary)
+            .arg(&obb_binary.unwrap())
             .arg(obb_device_path)
             .status()
             .context("Failed to copy obb")?;
