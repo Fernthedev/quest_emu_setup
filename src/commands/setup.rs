@@ -11,24 +11,24 @@ use crate::{
     downloader,
 };
 
-#[derive(clap::Args)]
+#[cfg_attr(feature = "clap", derive(clap::Args))]
 pub struct SetupArgs {
     /// Install the Android SDK tools
     /// This includes the SDK Manager, platform tools, and build tools
     /// By default, this is prompted if the tools are not found
-    #[arg(long = "sdk", default_value_t = false)]
+    #[cfg_attr(feature = "clap", arg(long = "sdk", default_value_t = false))]
     install_sdk: bool,
 
     /// Install the Android Emulator and system image
-    #[arg(long = "emulator", default_value_t = false)]
+    #[cfg_attr(feature = "clap", arg(long = "emulator", default_value_t = false))]
     install_emulator: bool,
 
     /// Path to the Android SDK Manager
-    #[arg(long)]
+    #[cfg_attr(feature = "clap", arg(long))]
     sdk_manager_path: Option<PathBuf>,
 
     /// System image of AVD (Android Virtual Device)
-    #[arg(long = "image", default_value_t = constants::DEFAULT_AVD_IMAGE.to_string())]
+    #[cfg_attr(feature = "clap", arg(long = "image", default_value_t = constants::DEFAULT_AVD_IMAGE.to_string()))]
     system_image: String,
 }
 

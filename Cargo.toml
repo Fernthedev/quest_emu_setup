@@ -10,14 +10,11 @@ ureq = ["dep:ureq"]
 # Use reqwest for HTTP requests
 # MBF-Agent uses ureq, so this will bloat the binary a bit.
 reqwest = ["dep:reqwest"]
-clap = []
+clap = ["dep:clap"]
 
 [dependencies]
 # No need for tracing support
 color-eyre = { version = "0.6", default-features = false }
-
-# progress bar
-pbr = { version = "*" } #{ git = "https://github.com/a8m/pb.git" }
 
 bytes = "*"
 reqwest = { version = "0.12", features = [
@@ -36,38 +33,30 @@ ureq = { version = "3", features = [
 # For APKs, the zip crate doesn't align the way V2 signature for Android requires. We use Laurie's amazing work here.
 mbf-zip = { git = "https://github.com/Lauriethefish/ModsBeforeFriday.git", package = "mbf-zip", branch = "main" }
 mbf-axml = { git = "https://github.com/Lauriethefish/ModsBeforeFriday.git", package = "mbf-axml", branch = "main" }
+# awaiting PR https://github.com/Lauriethefish/ModsBeforeFriday/pull/81
 mbf-res-man = { git = "https://github.com/Fernthedev/ModsBeforeFriday.git", package = "mbf-res-man", branch = "mbf-agent-man-more" }
 
-clap = { version = "4", features = ["derive"] }
+clap = { version = "4", features = ["derive"], optional = true  }
 
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-
-owo-colors = "4"
 dirs = "6.0.0"
 
+# Only used to extract the (plain Deflate) Android cmdline-tools zip; no need
+# for the other codecs or the write-side zopfli compressor.
 zip = { version = "6", default-features = false, features = [
-    "zstd",
-    "nt-time",
-    "deflate",
-    "deflate-flate2",
-    "deflate-zopfli",
-    "deflate64",
-    "lzma",
-    "bzip2",
+    "deflate-flate2-zlib-rs",
 ] }
 
-walkdir = "2"
-symlink = "0.1.0"
-fs_extra = "1.2"
 itertools = "0.14"
 indicatif = "0.18"
 dialoguer = "0.12"
 
 xml = "0.8"
-byteorder = "1.5"
 semver = "1.0"
 
+[[bin]]
+name = "quest_emu"
+path = "src/main.rs"
+required-features = ["clap"]
 
 [profile.release]
 opt-level = 3

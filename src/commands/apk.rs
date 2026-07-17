@@ -17,21 +17,23 @@ use crate::{
 };
 use mbf_axml::{AxmlReader, AxmlWriter, axml_to_xml, xml_to_axml};
 
-#[derive(clap::Parser, Debug)]
+#[cfg_attr(feature = "clap", derive(clap::Parser))]
+#[derive(Debug)]
 pub struct ApkArgs {
-    #[command(subcommand)]
+    #[cfg_attr(feature = "clap", command(subcommand))]
     action: ApkAction,
 }
 
-#[derive(clap::Subcommand, Debug)]
+#[cfg_attr(feature = "clap", derive(clap::Subcommand))]
+#[derive(Debug)]
 pub enum ApkAction {
     /// Download an APK from Oculus Graph and optionally patch and install it
     Download {
         /// Oculus auth token, can be found in the browser devtools when logged in to oculus.com
-        #[arg(long)]
+        #[cfg_attr(feature = "clap", arg(long))]
         token: String,
         /// The ID of the APK to download, e.g. "com.beatgames.beatsaber" is 2448060205267927
-        #[arg(long, default_value = "2448060205267927")]
+        #[cfg_attr(feature = "clap", arg(long, default_value = "2448060205267927"))]
         graph_app_id: String,
         /// The version of the APK to download, e.g. "1.0.0"
         fuzzy_version: String,
@@ -40,11 +42,11 @@ pub enum ApkAction {
         output: Option<PathBuf>,
 
         /// Patches the APK after download to work in the emulator
-        #[arg(long, default_value_t = true)]
+        #[cfg_attr(feature = "clap", arg(long, default_value_t = true))]
         patch: bool,
 
         /// Installs APK and obb after download
-        #[arg(long, default_value_t = false)]
+        #[cfg_attr(feature = "clap", arg(long, default_value_t = false))]
         install: bool,
     },
     /// Patch an APK to work in the emulator.

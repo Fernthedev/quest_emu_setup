@@ -5,18 +5,19 @@ use itertools::Itertools;
 
 use crate::{commands::Command, constants::{self, emulator_path}};
 
-#[derive(clap::Parser, Debug)]
+#[cfg_attr(feature = "clap", derive(clap::Parser))]
+#[derive(Debug)]
 pub struct StartArgs {
     /// Name of the AVD to start
-    #[arg(long, default_value_t = constants::DEFAULT_AVD_NAME.to_string())]
+    #[cfg_attr(feature = "clap", arg(long, default_value_t = constants::DEFAULT_AVD_NAME.to_string()))]
     pub name: String,
 
     /// Start the emulator without loading a snapshot
-    #[arg(long, default_value_t = false)]
+    #[cfg_attr(feature = "clap", arg(long, default_value_t = false))]
     pub fresh: bool,
 
     /// Additional arguments to pass to the emulator
-    #[arg(last = true)]
+    #[cfg_attr(feature = "clap", arg(last = true))]
     pub args: Vec<String>,
 }
 

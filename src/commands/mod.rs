@@ -11,7 +11,7 @@ pub trait Command {
     fn execute(self, ctx: &GlobalContext) -> color_eyre::Result<()>;
 }
 
-#[derive(clap::Parser)]
+#[cfg_attr(feature = "clap", derive(clap::Parser))]
 pub enum MainCommand {
     /// Create for Quest emulator. Downloads sdkmanager, emulator, system images, etc.
     Create(create::CreateArgs),
