@@ -31,10 +31,10 @@ ureq = { version = "3", features = [
 ], optional = true }
 
 # For APKs, the zip crate doesn't align the way V2 signature for Android requires. We use Laurie's amazing work here.
-mbf-zip = { git = "https://github.com/Lauriethefish/ModsBeforeFriday.git", package = "mbf-zip", branch = "main" }
-mbf-axml = { git = "https://github.com/Lauriethefish/ModsBeforeFriday.git", package = "mbf-axml", branch = "main" }
+mbf-zip = { git = "https://github.com/Fernthedev/ModsBeforeFriday.git", package = "mbf-zip", branch = "dependency-improvements-and-man" }
+mbf-axml = { git = "https://github.com/Fernthedev/ModsBeforeFriday.git", package = "mbf-axml", branch = "dependency-improvements-and-man" }
 # awaiting PR https://github.com/Lauriethefish/ModsBeforeFriday/pull/81
-mbf-res-man = { git = "https://github.com/Fernthedev/ModsBeforeFriday.git", package = "mbf-res-man", branch = "mbf-agent-man-more" }
+mbf-res-man = { git = "https://github.com/Fernthedev/ModsBeforeFriday.git", package = "mbf-res-man", branch = "dependency-improvements-and-man" }
 
 clap = { version = "4", features = ["derive"], optional = true  }
 
