@@ -31,7 +31,7 @@ pub enum DebugAction {
     /// Push the NDK's lldb-server binary onto the device and copy it into the
     /// target app's private storage. Does not start it; use `start-lldb-server`
     /// for that. The app must be debuggable (`android:debuggable="true"`).
-    InstallLldbServer {
+    Install {
         /// Android package name of the app to debug, e.g. "com.beatgames.beatsaber"
         package: String,
 
@@ -43,7 +43,7 @@ pub enum DebugAction {
     /// Launch the lldb-server already installed (see `install-lldb-server`) in the
     /// target app's private storage as a debug platform server via `run-as`, and
     /// forward the debug port to the host.
-    StartLldbServer {
+    Start {
         /// Android package name of the app to debug, e.g. "com.beatgames.beatsaber"
         package: String,
 
@@ -86,10 +86,10 @@ pub enum DebugAction {
 impl Command for DebugArgs {
     fn execute(self, _ctx: &super::GlobalContext) -> color_eyre::Result<()> {
         match self.action {
-            DebugAction::InstallLldbServer { package, arch } => {
+            DebugAction::Install { package, arch } => {
                 install_lldb_server(&package, arch.as_deref())?;
             }
-            DebugAction::StartLldbServer { package, port } => {
+            DebugAction::Start { package, port } => {
                 start_lldb_server(&package, port)?;
             }
             DebugAction::Attach {
