@@ -140,7 +140,7 @@ fn install_lldb_server(package: &str, arch: Option<&str>) -> color_eyre::Result<
     let device_tmp_path = "/data/local/tmp/lldb-server";
 
     println!("Pushing lldb-server ({arch}) to device...");
-    adb_status(&["push", &lldb_server_path, device_tmp_path])
+    adb_status(&["push", &lldb_server_path.display().to_string(), device_tmp_path])
         .context("Failed to push lldb-server to device")?;
     adb_status(&["shell", "chmod", "755", device_tmp_path])
         .context("Failed to chmod lldb-server on device")?;

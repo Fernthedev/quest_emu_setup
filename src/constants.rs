@@ -39,6 +39,7 @@ pub fn android_ndk_path() -> PathBuf {
     std::env::var("ANDROID_NDK_HOME")
         .ok()
         .map(PathBuf::from)
+        // TODO: Find it in the SDK's ndk directory, if there are multiple versions installed
         // .or_else(|| {
         //     let home = dirs::home_dir()?;
         //     Some(home.join("Android/Sdk/ndk-bundle"))
@@ -133,7 +134,9 @@ fn ndk_lib_arch(arch: &str) -> &str {
     }
 }
 
-pub fn lldb_server_path(arch: &str) -> String {
+/// Returns the path to the lldb-server executable for the given architecture
+/// {ndk}/toolchains/llvm/prebuilt/{host}/lib/clang/<version>/lib/linux/{arch}/lldb-server
+pub fn lldb_server_path(arch: &str) -> PathBuf {
     let ndk = crate::constants::android_ndk_path();
     let arch = ndk_lib_arch(arch);
 
@@ -147,32 +150,39 @@ pub fn lldb_server_path(arch: &str) -> String {
     #[cfg(target_os = "macos")]
     let host_os = "darwin-x86_64";
 
-    let clang_version = {
-        // find clang version from ndk path
-        let clang_path = ndk
-            .join("toolchains/llvm/prebuilt")
-            .join(host_os)
-            .join("lib/clang");
-        
-        std::fs::read_dir(clang_path)
+    // find clang version from ndk path
+    let clang_path = ndk
+        .join("toolchains")
+        .join("llvm")
+        .join("prebuilt")
+        .join(host_os)
+        .join("lib")
+        .join("clang");
+
+    let clang_versioned_path = {
+        clang_path
+            .read_dir()
             .expect("Failed to read clang directory")
             .filter_map(|entry| entry.ok())
             .filter(|entry| entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false))
-            .map(|entry| entry.file_name().into_string().unwrap())
-            .max()
+            .max_by_key(|entry| entry.file_name())
             .expect("Failed to find clang version in NDK path")
+            .path()
     };
 
-    ndk
-        .join("toolchains/llvm/prebuilt")
-        .join(host_os)
-        .join("lib/clang")
-        .join(clang_version)
+    // let clang_version = {
+    //     std::fs::read_dir(clang_path)
+    //         .expect("Failed to read clang directory")
+    //         .filter_map(|entry| entry.ok())
+    //         .filter(|entry| entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false))
+    //         .map(|entry| entry.file_name().into_string().unwrap())
+    //         .max()
+    //         .expect("Failed to find clang version in NDK path")
+    // };
+
+    clang_versioned_path
         .join("lib")
         .join("linux")
         .join(arch)
         .join("lldb-server")
-        .to_str()
-        .unwrap()
-        .to_string()
 }
