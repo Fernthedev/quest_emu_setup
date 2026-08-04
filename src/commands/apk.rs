@@ -13,7 +13,7 @@ use semver::Version;
 
 use crate::{
     commands::Command,
-    constants::{self, adb_path},
+    constants::adb_path,
 };
 use mbf_axml::{AxmlReader, AxmlWriter, axml_to_xml, xml_to_axml};
 
@@ -210,7 +210,7 @@ fn do_install(
         .status()
         .context("Failed to install APK")?;
     if obb_binary.is_some_and(|o| o.exists()) {
-        let file_name = obb_binary.as_deref().unwrap().file_name().unwrap().to_string_lossy().to_string();
+        let file_name = obb_binary.unwrap().file_name().unwrap().to_string_lossy().to_string();
         // Extract package name from filename main.{id}.{package_name}.obb
         let package_name: String = file_name
             .split('.')
@@ -229,7 +229,7 @@ fn do_install(
 
         std::process::Command::new(&adb_path)
             .arg("push")
-            .arg(&obb_binary.unwrap())
+            .arg(obb_binary.unwrap())
             .arg(obb_device_path)
             .status()
             .context("Failed to copy obb")?;

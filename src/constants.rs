@@ -153,17 +153,17 @@ pub fn lldb_server_path(arch: &str) -> String {
             .join("toolchains/llvm/prebuilt")
             .join(host_os)
             .join("lib/clang");
-        let clang_version = std::fs::read_dir(clang_path)
+        
+        std::fs::read_dir(clang_path)
             .expect("Failed to read clang directory")
             .filter_map(|entry| entry.ok())
             .filter(|entry| entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false))
             .map(|entry| entry.file_name().into_string().unwrap())
             .max()
-            .expect("Failed to find clang version in NDK path");
-        clang_version
+            .expect("Failed to find clang version in NDK path")
     };
 
-    return ndk
+    ndk
         .join("toolchains/llvm/prebuilt")
         .join(host_os)
         .join("lib/clang")
@@ -174,5 +174,5 @@ pub fn lldb_server_path(arch: &str) -> String {
         .join("lldb-server")
         .to_str()
         .unwrap()
-        .to_string();
+        .to_string()
 }
