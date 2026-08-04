@@ -2,6 +2,7 @@ pub mod apk;
 pub mod create;
 pub mod setup;
 pub mod start;
+pub mod debug;
 
 pub struct GlobalContext {
     pub yes: bool,
@@ -21,6 +22,8 @@ pub enum MainCommand {
     Apk(apk::ApkArgs),
     /// Setup the Android SDK, Emulator, and AVD
     Setup(setup::SetupArgs),
+    /// Debug commands for the emulator
+    Debug(debug::DebugArgs),
 }
 
 impl Command for MainCommand {
@@ -30,6 +33,7 @@ impl Command for MainCommand {
             MainCommand::Apk(args) => args.execute(ctx)?,
             MainCommand::Start(args) => args.execute(ctx)?,
             MainCommand::Setup(setup_args) => setup_args.execute(ctx)?,
+            MainCommand::Debug(debug_args) => debug_args.execute(ctx)?,
         }
 
         Ok(())
