@@ -5,13 +5,13 @@
 // <path-to-ndk>\toolchains\llvm\prebuilt\windows-x86_64\lib\clang\<version>\lib\linux\aarch64\lldb-server
 
 use std::{
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::Stdio,
     thread,
     time::Duration,
 };
 
-use color_eyre::eyre::{Context, bail};
+use color_eyre::eyre::Context;
 
 use crate::{
     adb::{self, adb_status, detect_device_arch}, commands::Command, constants::{self, adb_path}, lldb::{self, AttachInfo},
@@ -28,8 +28,8 @@ pub struct DebugArgs {
 #[derive(Debug)]
 pub enum DebugAction {
     /// Push the NDK's lldb-server binary onto the device and copy it into the
-    /// target app's private storage. Does not start it; use `start-lldb-server`
-    /// for that. The app must be debuggable (`android:debuggable="true"`).
+    /// target app's private storage. Does not start it; use `attach` for that.
+    /// The app must be debuggable (`android:debuggable="true"`).
     Install {
         /// Android package name of the app to debug, e.g. "com.beatgames.beatsaber"
         package: String,
@@ -39,21 +39,10 @@ pub enum DebugAction {
         arch: Option<String>,
     },
 
-    /// Launch the lldb-server already installed (see `install-lldb-server`) in the
-    /// target app's private storage as a debug platform server via `run-as`, and
-    /// forward the debug port to the host.
-    Start {
-        /// Android package name of the app to debug, e.g. "com.beatgames.beatsaber"
-        package: String,
-
-        /// The port to forward and listen on
-        #[cfg_attr(feature = "clap", arg(short, long, default_value_t = 5039))]
-        port: u16,
-    },
-
-    /// Start lldb-server (see `start-lldb-server`), force-stop and relaunch the app,
-    /// then open a VS Code attach session for it via the lldb-dap extension
-    /// (llvm-vs-code-extensions.lldb-dap).
+    /// Install lldb-server (see `install`), launch it as a debug platform server,
+    /// then attach to the app as it's already running (pass `--relaunch` to
+    /// force-stop and relaunch it fresh first) and open a VS Code attach session
+    /// for it via the lldb-dap extension (llvm-vs-code-extensions.lldb-dap).
     Attach {
         /// Android package name of the app to debug, e.g. "com.beatgames.beatsaber"
         package: String,
@@ -79,6 +68,16 @@ pub enum DebugAction {
         /// to preload in lldb (`target symbols add`)
         #[cfg_attr(feature = "clap", arg(long = "symbols"))]
         symbols: Vec<PathBuf>,
+
+        /// Write the target's pid to this file (e.g. for a VS Code task to feed
+        /// into a launch.json config via the Command Variable extension)
+        #[cfg_attr(feature = "clap", arg(long))]
+        pid_file: Option<PathBuf>,
+
+        /// Force-stop and relaunch the app fresh before attaching, instead of
+        /// attaching to it as it's already running
+        #[cfg_attr(feature = "clap", arg(long, default_value_t = false))]
+        relaunch: bool,
     },
 }
 
@@ -88,9 +87,6 @@ impl Command for DebugArgs {
             DebugAction::Install { package, arch } => {
                 install_lldb_server(&package, arch.as_deref())?;
             }
-            DebugAction::Start { package, port } => {
-                start_lldb_server(&package, port)?;
-            }
             DebugAction::Attach {
                 package,
                 arch,
@@ -98,10 +94,20 @@ impl Command for DebugArgs {
                 code_bin,
                 open,
                 symbols,
+                pid_file,
+                relaunch,
             } => {
                 install_lldb_server(&package, arch.as_deref())?;
-                start_lldb_server(&package, port)?;
-                attach(&package, port, &code_bin, open, &symbols)?;
+                start_lldb_platform_server(&package, port)?;
+                attach(
+                    &package,
+                    port,
+                    &code_bin,
+                    open,
+                    &symbols,
+                    pid_file.as_deref(),
+                    relaunch,
+                )?;
             }
         }
 
@@ -117,15 +123,6 @@ fn resolve_arch(arch: Option<&str>) -> color_eyre::Result<String> {
 }
 
 const APP_LLDB_SERVER_PATH: &str = "./lldb-server";
-
-/// True if lldb-server is already sitting in `package`'s private storage.
-fn lldb_server_installed(package: &str) -> color_eyre::Result<bool> {
-    let status = std::process::Command::new(adb_path())
-        .args(["shell", "run-as", package, "test", "-e", APP_LLDB_SERVER_PATH])
-        .status()
-        .context("Failed to check for lldb-server in app storage")?;
-    Ok(status.success())
-}
 
 /// Installs lldb-server into `package`'s private storage, in order:
 /// 1. `adb push` lldb-server to shared storage (can't push directly into an app's
@@ -177,17 +174,8 @@ fn install_lldb_server(package: &str, arch: Option<&str>) -> color_eyre::Result<
 
 /// Forwards `port` and launches the lldb-server already installed (see
 /// `install_lldb_server`) in `package`'s private storage as a platform server,
-/// in the background, so it's still listening after this function returns. Then
-/// waits for `package` to be running and prints the lldb-dap attach info for it,
-/// same as `attach` does, minus the force-stop/relaunch and opening VS Code.
-fn start_lldb_server(package: &str, port: u16) -> color_eyre::Result<()> {
-    if !lldb_server_installed(package)? {
-        bail!(
-            "lldb-server is not installed in {package}'s private storage; \
-             run `install-lldb-server {package}` first"
-        );
-    }
-
+/// in the background, so it's still listening after this function returns.
+fn start_lldb_platform_server(package: &str, port: u16) -> color_eyre::Result<()> {
     println!("Forwarding port {port}");
     adb_status(&["forward", &format!("tcp:{port}"), &format!("tcp:{port}")])
         .context("Failed to forward debug port")?;
@@ -212,43 +200,48 @@ fn start_lldb_server(package: &str, port: u16) -> color_eyre::Result<()> {
     // Give it a moment to start listening before callers try to connect.
     thread::sleep(Duration::from_millis(500));
 
-    let pid = adb::wait_for_pid(package)?;
-    let info = lldb::build_attach_info(&pid, port, &[])?;
-    print_attach_info(port, &info);
-    
     Ok(())
 }
 
-/// Force-stops and relaunches `package`, then opens an lldb-dap attach session
-/// pointed at the lldb-server started by `start_lldb_server`, in order:
-/// 1. `am force-stop` the app, so step 2 launches it fresh.
-/// 2. `monkey` launch it back up via its default launcher intent.
-/// 3. Wait for the new process to show up and build its attach info (see
+/// Attaches to `package` as it's already running, or (if `relaunch`) force-stops
+/// and relaunches it fresh first, then opens an lldb-dap attach session pointed
+/// at the lldb-server started by `start_lldb_platform_server`, in order:
+/// 1. If `relaunch`: `am force-stop` the app, then `monkey` launch it back up
+///    via its default launcher intent, so it comes back with a fresh pid.
+/// 2. Wait for the process to show up and build its attach info (see
 ///    `wait_for_pid`/`build_attach_info`).
-/// 4. Print it, and open it with `code --open-url` if requested.
+/// 3. Print it, and open it with `code --open-url` if requested.
 fn attach(
     package: &str,
     port: u16,
     code_bin: &str,
     open_vscode: bool,
     symbols: &[PathBuf],
+    pid_file: Option<&Path>,
+    relaunch: bool,
 ) -> color_eyre::Result<()> {
-    println!("Restarting {package}...");
-    adb_status(&["shell", "am", "force-stop", package]).context("Failed to force-stop the app")?;
-    adb_status(&[
-        "shell",
-        "monkey",
-        "-p",
-        package,
-        "-c",
-        "android.intent.category.LAUNCHER",
-        "1",
-    ])
-    .context("Failed to launch the app")?;
+    if relaunch {
+        println!("Restarting {package}...");
+        adb_status(&["shell", "am", "force-stop", package])
+            .context("Failed to force-stop the app")?;
+        adb_status(&[
+            "shell",
+            "monkey",
+            "-p",
+            package,
+            "-c",
+            "android.intent.category.LAUNCHER",
+            "1",
+        ])
+        .context("Failed to launch the app")?;
+    } else {
+        println!("Attaching to already-running {package}...");
+    }
 
     let pid = adb::wait_for_pid(package)?;
     let info = lldb::build_attach_info(&pid, port, symbols)?;
     print_attach_info(port, &info);
+    write_pid_file(pid_file, info.pid)?;
 
     if open_vscode {
         println!("Opening VS Code debug session...");
@@ -281,4 +274,15 @@ fn print_attach_info(port: u16, info: &AttachInfo) {
     println!("Attach URI: {}", info.debug_uri);
     println!("PID: {}", info.pid);
     println!("Config: {}", info.config_json);
+}
+
+/// Writes the bare pid to `path`, if given, for a VS Code task to hand off to a
+/// launch.json config (e.g. via the Command Variable extension) after this
+/// process's `preLaunchTask` run finishes.
+fn write_pid_file(path: Option<&Path>, pid: u32) -> color_eyre::Result<()> {
+    let Some(path) = path else {
+        return Ok(());
+    };
+    std::fs::write(path, pid.to_string())
+        .with_context(|| format!("Failed to write pid file at {}", path.display()))
 }
