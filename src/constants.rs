@@ -14,7 +14,18 @@ pub const ANDROID_SDK_TOOLS: &str =
 
 pub const DEFAULT_AVD_NAME: &str = "android13desktop";
 
-pub const DEFAULT_AVD_IMAGE: &str = "system-images;android-33;android-desktop;x86_64";
+/// Returns the default AVD system image, using an ABI that matches the host CPU.
+/// QEMU2 (the Android Emulator backend) requires the system image architecture to
+/// match the host architecture, so an aarch64 host (e.g. Apple Silicon, arm64 Linux)
+/// needs an arm64-v8a image rather than the x86_64 one used on x86_64 hosts.
+pub fn default_avd_image() -> String {
+    let abi = if cfg!(target_arch = "aarch64") {
+        "arm64-v8a"
+    } else {
+        "x86_64"
+    };
+    format!("system-images;android-33;android-desktop;{abi}")
+}
 
 /// Returns the path to the Android SDK
 /// Checks the ANDROID_SDK_ROOT and ANDROID_HOME environment variables

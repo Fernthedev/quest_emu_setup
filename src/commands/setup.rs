@@ -28,7 +28,7 @@ pub struct SetupArgs {
     sdk_manager_path: Option<PathBuf>,
 
     /// System image of AVD (Android Virtual Device)
-    #[cfg_attr(feature = "clap", arg(long = "image", default_value_t = constants::DEFAULT_AVD_IMAGE.to_string()))]
+    #[cfg_attr(feature = "clap", arg(long = "image", default_value_t = constants::default_avd_image()))]
     system_image: String,
 }
 
