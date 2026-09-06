@@ -43,9 +43,23 @@ pub fn detect_device_arch() -> color_eyre::Result<String> {
         .args(["shell", "getprop", "ro.product.cpu.abi"])
         .output()
         .context("Failed to query the device's CPU ABI via adb")?;
+
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if !output.status.success() {
+        bail!(
+            "`adb shell getprop ro.product.cpu.abi` exited with status {}{}",
+            output.status,
+            if stderr.is_empty() { String::new() } else { format!(": {stderr}") }
+        );
+    }
+
     let abi = String::from_utf8_lossy(&output.stdout).trim().to_string();
     if abi.is_empty() {
-        bail!("Could not detect the device's CPU ABI; pass the architecture explicitly");
+        bail!(
+            "Could not detect the device's CPU ABI (empty response from adb); \
+             pass the architecture explicitly{}",
+            if stderr.is_empty() { String::new() } else { format!(". adb stderr: {stderr}") }
+        );
     }
     Ok(abi)
 }
