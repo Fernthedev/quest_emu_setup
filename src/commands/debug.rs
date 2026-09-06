@@ -206,8 +206,9 @@ fn start_lldb_platform_server(package: &str, port: u16) -> color_eyre::Result<()
 /// Attaches to `package` as it's already running, or (if `relaunch`) force-stops
 /// and relaunches it fresh first, then opens an lldb-dap attach session pointed
 /// at the lldb-server started by `start_lldb_platform_server`, in order:
-/// 1. If `relaunch`: `am force-stop` the app, then `monkey` launch it back up
-///    via its default launcher intent, so it comes back with a fresh pid.
+/// 1. If `relaunch`: resolve the app's launcher activity component and
+///    `am start -S` it, which force-stops the app and relaunches it fresh
+///    in one step, so it comes back with a fresh pid.
 /// 2. Wait for the process to show up and build its attach info (see
 ///    `wait_for_pid`/`build_attach_info`).
 /// 3. Print it, and open it with `code --open-url` if requested.
@@ -222,18 +223,9 @@ fn attach(
 ) -> color_eyre::Result<()> {
     if relaunch {
         println!("Restarting {package}...");
-        adb_status(&["shell", "am", "force-stop", package])
-            .context("Failed to force-stop the app")?;
-        adb_status(&[
-            "shell",
-            "monkey",
-            "-p",
-            package,
-            "-c",
-            "android.intent.category.LAUNCHER",
-            "1",
-        ])
-        .context("Failed to launch the app")?;
+        let component = adb::resolve_launch_component(package)?;
+        adb_status(&["shell", "am", "start", "-S", "-n", &component])
+            .context("Failed to launch the app")?;
     } else {
         println!("Attaching to already-running {package}...");
     }
